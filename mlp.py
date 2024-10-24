@@ -28,9 +28,9 @@ smote_os = SMOTE(random_state=42, k_neighbors=1)
 random_os = RandomOverSampler(random_state=42)
 
 param_grid = {'learning_rate_init': [0.01, 0.05, 0.1],
-              #'learning_rate': ['constant', 'adaptive'],
-              #'alpha': [0.0001, 0.005, 0.01],
-              #'batch_size': [8, 16, 32, 64],
+              'learning_rate': ['constant', 'adaptive'],
+              'alpha': [0.0001, 0.005, 0.01],
+              'batch_size': [8, 16, 32, 64],
               'hidden_layer_sizes': [(128, 64, 32), (150, 100, 50)]}
 new_param_grid = {'mlpclassifier__' + key: param_grid[key] for key in param_grid}
 

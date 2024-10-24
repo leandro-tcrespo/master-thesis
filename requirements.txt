@@ -1,0 +1,6 @@
+pandas~=2.2.2
+numpy~=2.1.1
+lime~=0.2.0.1
+scikit-learn~=1.5.1
+matplotlib~=3.9.2
+imbalanced-learn==0.12.3

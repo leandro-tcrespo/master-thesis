@@ -5,7 +5,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import GridSearchCV
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTENC
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.pipeline import make_pipeline
 
@@ -21,10 +21,9 @@ train_data, test_data, train_labels, test_labels = datasets
 enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore',),
                         ['sex', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
                          'n', 'o', 'p', 'q'])], remainder='passthrough', sparse_threshold=0)
-train_data = enc.fit_transform(train_data)
-test_data = enc.transform(test_data)
 
-smote_os = SMOTE(random_state=42, k_neighbors=1)
+smote_os = SMOTENC(random_state=42, k_neighbors=1, categorical_features=['sex', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                         'n', 'o', 'p', 'q'])
 random_os = RandomOverSampler(random_state=42)
 
 param_grid = {'learning_rate_init': [0.01, 0.05, 0.1],
@@ -35,8 +34,8 @@ param_grid = {'learning_rate_init': [0.01, 0.05, 0.1],
 new_param_grid = {'mlpclassifier__' + key: param_grid[key] for key in param_grid}
 
 mlp = MLPClassifier(max_iter=1000, random_state=42)
-imba_pipeline_smote = make_pipeline(smote_os, mlp)
-imba_pipeline_random = make_pipeline(random_os, mlp)
+imba_pipeline_smote = make_pipeline(smote_os, enc, mlp)
+imba_pipeline_random = make_pipeline(random_os, enc, mlp)
 grid_mlp_smote = GridSearchCV(imba_pipeline_smote, param_grid=new_param_grid, cv=3, verbose=4, error_score='raise')
 grid_mlp_random = GridSearchCV(imba_pipeline_random, param_grid=new_param_grid, cv=3, verbose=4, error_score='raise')
 

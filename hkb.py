@@ -1,3 +1,6 @@
+import logging
+import os
+import re
 import shlex
 import subprocess
 
@@ -5,7 +8,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
-def convert_to_intekrator(df):
+def convert_cat_features(df):
     for col in df.columns:
         if col == 'sex':
             df[col] = df[col].apply(lambda val: "female" if val in [1] else "male")
@@ -14,71 +17,125 @@ def convert_to_intekrator(df):
     return df
 
 
-def fit(train_data, train_labels):
-    train_data_copy = train_data.copy()
-    convert_to_intekrator(train_data_copy)
-    train_labels_copy = train_labels.copy()
-    diag_multi_col = train_labels_copy.pop("diag_multi")
-    train_data_copy.insert(19, "diag_multi", diag_multi_col)
-    train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
-    command = ["java", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
-               "any", "hkb_train_data.txt", "knowledge.kb"]
-    subprocess.run(command, capture_output=True, shell=True)
-
-
-def predict(data, pred_out='predictions.txt'):
-    with open(pred_out, 'w') as file:
-        file.write('')
-    test_data_copy = data.copy()
-    convert_to_intekrator(test_data_copy)
+# this is only relevant for properly using InteKRators infer module, not relevant for fitting model
+def convert_num_features(data):
     formatted_data = []
-    predictions = np.array([])
-    for index, row in test_data_copy.iterrows():
+    for index, row in data.iterrows():
         row_list = row.astype(str)
         row_list.iloc[1] = 'S2:' + row_list.iloc[1]
         row = ' '.join(row_list)
         formatted_data.append(row)
-    for item in formatted_data:
+    return formatted_data
+
+
+def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
+    with open(outfile, 'w') as file:
+        for line in formatted_data:
+            file.write(line + '\n')
+
+
+def check_state(item):
+    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|3|9)){17}$"
+    if not re.match(pattern, item):
+        return False
+    return True
+
+
+def fit(train_data, train_labels):
+    try:
+        print("Fitting HKB.")
+        train_data_copy = train_data.copy()
+        convert_cat_features(train_data_copy)
+        train_labels_copy = train_labels.copy()
+        diag_multi_col = train_labels_copy.pop("diag_multi")
+        train_data_copy.insert(19, "diag_multi", diag_multi_col)
+        train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
+        command = ["java", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
+                   "any", "hkb_train_data.txt", "knowledge.kb"]
+        # clear knowledge base so failed fit is not covered up by previous successful fit this is
+        # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
+        with open('knowledge.kb', 'w') as file:
+            file.write('')
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        with open('./output/fit_output.txt', 'w') as o:
+            o.write(result.stdout)
+            o.write(result.stderr)
+        if os.path.getsize('knowledge.kb') == 0:
+            raise ValueError("The knowledge base is empty, HKB fitting probably failed."
+                             "Check './output/fitting_output.txt' for details.")
+        print("HKB fitted successfully.")
+    except subprocess.CalledProcessError as e:
+        with open('./output/fit_output.txt', 'w') as o:
+            o.write(e.stdout)
+            o.write(e.stderr)
+        raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
+
+
+def intekrator_infer(item, pred_out):
+    try:
         command = (["java", "-jar", "InteKRator.jar", "-infer", "why"]
                    + shlex.split(item)
-                   + ["knowledge.kb","inference.txt"])
-        subprocess.run(command, capture_output=True, shell=True)
+                   + ["knowledge.kb", "inference.txt"])
+        # clear inference file so failed inference is not covered up by previous successful inference, this is
+        # necessary since InteKRator may fail without raising a CalledProcessError and leave inference.txt unchanged
+        with open('inference.txt', 'w') as file:
+            file.write('')
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        with open('./output/infer_output.txt', 'w') as o:
+            o.write(result.stdout)
+            o.write(result.stderr)
         with open('inference.txt', 'r') as file:
             line = file.readline().strip()
+        # this case should never be reached as long as the fit was successful
+        if line == "":
+            raise ValueError(f"No inference possible for state \n{item}.\n"
+                             f"Is the knowledge base empty or without top rule? "
+                             f"If not, check './output/infer_output.txt' for details.")
         with open(pred_out, 'a') as append_file:
-            append_file.write(item + '\n')
+            # append_file.write(item + '\n')
             append_file.write(line + '\n')
-            append_file.write('\n')
-        prediction = line.split('   (')[0]
-        predictions = np.append(predictions, prediction)
+        return line
+    except subprocess.CalledProcessError as e:
+        with open('./output/infer_output.txt', 'w') as o:
+            o.write(e.stdout)
+            o.write(e.stderr)
+        raise ValueError(f"Inference failed for state {item}. Check './output/infer_output.txt' for details.")
+
+
+def predict(data, pred_out='predictions.txt'):
+    print("Starting inference from HKB.")
+    with open(pred_out, 'w') as file:
+        file.write('')
+    data_copy = data.copy()
+    predictions = np.array([])
+    convert_cat_features(data_copy)
+    formatted_data = convert_num_features(data_copy)
+    data_to_txt(formatted_data)
+    for item in formatted_data:
+        if check_state(item):
+            line = intekrator_infer(item, pred_out)
+            prediction = line.split('   (')[0]
+            predictions = np.append(predictions, prediction)
+            with open(pred_out, 'a') as append_file:
+                append_file.write('\n')
+        else:
+            raise ValueError(f"Invalid format for state {item}.")
+    print(f"Inference successful. Check {pred_out} for all predictions.")
     return predictions
 
 
 def predict_proba(data, pred_out='predictions.txt'):
+    print("Starting inference from HKB.")
     with open(pred_out, 'w') as file:
         file.write('')
     data_copy = data.copy()
-    convert_to_intekrator(data_copy)
-    data.to_csv("intekrator_test.txt", sep=' ', index=False, header=False)
-    formatted_data = []
-    predictions = np.empty((0,4))
-    for index, row in data_copy.iterrows():
-        row_list = row.astype(str)
-        row_list.iloc[1] = 'S2:' + row_list.iloc[1]
-        row = ' '.join(row_list)
-        formatted_data.append(row)
+    convert_cat_features(data_copy)
+    formatted_data = convert_num_features(data_copy)
+    data_to_txt(formatted_data)
+    predictions = np.empty((0, 4))
     for item in formatted_data:
-        command = (["java", "-jar", "InteKRator.jar", "-infer", "why"] +
-                   shlex.split(item) +
-                   ["knowledge.kb", "inference.txt"])
-        subprocess.run(command, capture_output=True)
-        with open('inference.txt', 'r') as read_file:
-            line = read_file.readline().strip()
-        with open(pred_out, 'a') as append_file:
-            append_file.write(item + '\n')
-            append_file.write(line + '\n')
-            append_file.write('\n')
-        if line:
+        if check_state(item):
+            line = intekrator_infer(item, pred_out)
             prediction = line.split('   (')[0]
             part1 = line.split('[')[1]
             pred_proba_string = part1.split(']')[0]
@@ -90,11 +147,17 @@ def predict_proba(data, pred_out='predictions.txt'):
                 pred_probas = np.array([other_proba, pred_proba, other_proba, other_proba])
             elif prediction == "SpA":
                 pred_probas = np.array([other_proba, other_proba, pred_proba, other_proba])
-            else:
+            elif prediction == "PsA":
                 pred_probas = np.array([other_proba, other_proba, other_proba, pred_proba])
+            else:
+                raise ValueError(f"Predicted label {prediction} is not valid.")
+            with open(pred_out, 'a') as append_file:
+                append_file.write(str(pred_probas) + '\n')
+                append_file.write('\n')
+            predictions = np.append(predictions, [pred_probas], axis=0)
         else:
-            pred_probas = np.zeros(4)
-        predictions = np.append(predictions, [pred_probas], axis=0)
+            raise ValueError(f"Invalid format for state {item}.")
+    print(f"Inference successful. Check {pred_out} for all predictions.")
     return predictions
 
 

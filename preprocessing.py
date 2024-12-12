@@ -7,7 +7,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 def preprocess_data(csv_path):
     data = pd.read_csv(csv_path, header=0)
-    X = data.drop(['diag_multi', 'diag_binary'], axis=1)
+    X = data[['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q']]
     y = data[['diag_multi']]
     features = X.columns
     categorical_features = [name for name in features if name != 'age']

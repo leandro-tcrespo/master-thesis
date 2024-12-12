@@ -62,9 +62,7 @@ exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrap
 fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
 fig.show()
 hkb.fit(train_data, train_labels)
-hkb.predict_proba(test_data)
-hkb.predict(test_data)
-predictions = hkb.predict(test_data)
+predictions = hkb.predict(test_data, './output/predictions.txt')
 print("HKB results:")
 hkb.score(test_labels, predictions)
 

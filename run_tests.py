@@ -4,7 +4,9 @@ import pandas as pd
 from imblearn.pipeline import make_pipeline
 from lime import lime_tabular
 from sklearn.neural_network import MLPClassifier
+from sklearn.tree import DecisionTreeClassifier
 
+import dt
 import hkb
 import lime_utils
 import mlp
@@ -30,6 +32,10 @@ def predict_proba_wrapper_hkb(original_data):
 train_data, test_data, train_labels, test_labels, enc, smote_os, random_os = preprocessing.preprocess_data("./Synthetic_data.csv")
 train_data_lime = train_data.copy()
 train_data_lime = train_data_lime.to_numpy()
+
+################################################
+# MLP testing
+################################################
 
 base_mlp = MLPClassifier(max_iter=1000, random_state=42, early_stopping=True)
 smote_pipeline = make_pipeline(smote_os, enc, base_mlp)
@@ -61,6 +67,11 @@ explainer_mlp = lime_tabular.LimeTabularExplainer(
 exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrapper_mlp, top_labels=1)
 fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
 fig.show()
+
+################################################
+# HKB testing
+################################################
+
 hkb.fit(train_data, train_labels)
 predictions = hkb.predict(test_data, './output/predictions.txt')
 print("HKB results:")
@@ -77,3 +88,17 @@ explainer_hkb = lime_tabular.LimeTabularExplainer(
 exp_hkb = explainer_hkb.explain_instance(test_data.values[0], predict_proba_wrapper_hkb, top_labels=1, num_samples=100)
 fig = lime_utils.plot_lime(exp_hkb, './output/lime_plot_hkb.png')
 fig.show()
+
+################################################
+# DT testing
+################################################
+
+base_dt = DecisionTreeClassifier(random_state=42)
+dt_pipeline = make_pipeline(smote_os, enc, base_dt)
+
+print("Starting DT Training")
+grid_dt = dt.fit(dt_pipeline, train_data, train_labels)
+predictions_dt = grid_dt.predict(test_data)
+print("DT results:")
+dt.score(test_labels, predictions_dt)
+dt.plot_dt(grid_dt)

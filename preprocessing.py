@@ -16,7 +16,7 @@ def preprocess_data(csv_path):
     train_data, test_data, train_labels, test_labels = datasets
 
     enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features)],
-                            remainder='passthrough', sparse_threshold=0)
+                            remainder='passthrough', sparse_threshold=0, verbose_feature_names_out=False)
 
     smote_os = SMOTENC(random_state=42, k_neighbors=1, categorical_features=categorical_features)
     random_os = RandomOverSampler(random_state=42)

@@ -50,7 +50,7 @@ def fit(train_data, train_labels):
         diag_multi_col = train_labels_copy.pop("diag_multi")
         train_data_copy.insert(19, "diag_multi", diag_multi_col)
         train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
-        command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
+        command = ["java", "-Xmx8g", "-jar", "InteKRator.jar", "-learn", "top", "discretize", "2}3", "info",
                    "any", "hkb_train_data.txt", "knowledge.kb"]
         # clear knowledge base so failed fit is not covered up by previous successful fit this is
         # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged

@@ -1,7 +1,9 @@
 import os
 
+import numpy as np
 import pandas as pd
 from imblearn.pipeline import make_pipeline
+import metrics
 from lime import lime_tabular
 from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -53,20 +55,26 @@ predictions_mlp = grid_mlp_randomos.predict(test_data)
 print("RandomOS results:")
 mlp.score(test_labels, predictions_mlp)
 
-# todo add categorical names to make lime explanations more understandable,
-#  probably have to convert features 1,2,3,9 to 0,1,2,3 because
-#  categorical names dict is accessed by looking at index indicated by feature value i in column x: names[x][i]
-explainer_mlp = lime_tabular.LimeTabularExplainer(
-    train_data_lime,
-    categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
-    class_names=grid_mlp_smote.classes_.tolist(),
-    verbose=True,
-    random_state=42
-)
-exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrapper_mlp, top_labels=1)
-fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
-fig.show()
+# # todo add categorical names to make lime explanations more understandable,
+# #  probably have to convert features 1,2,3,9 to 0,1,2,3 because
+# #  categorical names dict is accessed by looking at index indicated by feature value i in column x: names[x][i]
+# explainer_mlp = lime_tabular.LimeTabularExplainer(
+#     train_data_lime,
+#     categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+#     feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
+#     class_names=grid_mlp_smote.classes_.tolist(),
+#     verbose=True,
+#     random_state=42
+# )
+# exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrapper_mlp, top_labels=1, num_features=19)
+# fi_values_dict = exp_mlp.as_list(exp_mlp.available_labels()[0])
+# fi_values = np.array([fi_value for _,fi_value in fi_values_dict])
+# print(metrics.compute_complexity(fi_values))
+# baseline = [1]*19
+# baseline = np.asarray(baseline)
+# print(metrics.faithfulness_corr(model=grid_mlp_smote, input_sample=test_data.values[0], feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'], attributions=fi_values, baseline=baseline, label=0))
+# fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
+# fig.show()
 
 ################################################
 # HKB testing
@@ -75,19 +83,19 @@ fig.show()
 hkb.fit(train_data, train_labels)
 predictions = hkb.predict(test_data, './output/predictions.txt')
 print("HKB results:")
-hkb.score(test_labels, predictions)
+metrics.score(test_labels, predictions)
 
-explainer_hkb = lime_tabular.LimeTabularExplainer(
-    train_data_lime,
-    categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
-    class_names=["Kein", "RA", "SpA", "PsA"],
-    verbose=True,
-    random_state=42
-)
-exp_hkb = explainer_hkb.explain_instance(test_data.values[0], predict_proba_wrapper_hkb, top_labels=1, num_samples=100)
-fig = lime_utils.plot_lime(exp_hkb, './output/lime_plot_hkb.png')
-fig.show()
+# explainer_hkb = lime_tabular.LimeTabularExplainer(
+#     train_data_lime,
+#     categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+#     feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
+#     class_names=["Kein", "RA", "SpA", "PsA"],
+#     verbose=True,
+#     random_state=42
+# )
+# exp_hkb = explainer_hkb.explain_instance(test_data.values[0], predict_proba_wrapper_hkb, top_labels=1, num_samples=100)
+# fig = lime_utils.plot_lime(exp_hkb, './output/lime_plot_hkb.png')
+# fig.show()
 
 ################################################
 # DT testing
@@ -100,5 +108,5 @@ print("Starting DT Training")
 grid_dt = dt.fit(dt_pipeline, train_data, train_labels)
 predictions_dt = grid_dt.predict(test_data)
 print("DT results:")
-dt.score(test_labels, predictions_dt)
+metrics.score(test_labels, predictions_dt)
 dt.plot_dt(grid_dt)

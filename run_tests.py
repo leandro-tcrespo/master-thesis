@@ -39,7 +39,7 @@ train_data_lime = train_data_lime.to_numpy()
 # MLP testing
 ################################################
 
-base_mlp = MLPClassifier(max_iter=1000, random_state=42, early_stopping=True)
+base_mlp = MLPClassifier(max_iter=500, random_state=42, early_stopping=True)
 smote_pipeline = make_pipeline(smote_os, enc, base_mlp)
 randomos_pipeline = make_pipeline(random_os, enc, base_mlp)
 
@@ -47,13 +47,13 @@ print("Starting SMOTE MLP Training")
 grid_mlp_smote = mlp.fit(smote_pipeline, train_data, train_labels)
 predictions_mlp = grid_mlp_smote.predict(test_data)
 print("SMOTE results:")
-mlp.score(test_labels, predictions_mlp)
+metrics.score(test_labels, predictions_mlp)
 
 print("Starting RandomOS MLP Training")
 grid_mlp_randomos = mlp.fit(randomos_pipeline, train_data, train_labels)
 predictions_mlp = grid_mlp_randomos.predict(test_data)
 print("RandomOS results:")
-mlp.score(test_labels, predictions_mlp)
+metrics.score(test_labels, predictions_mlp)
 
 # # todo add categorical names to make lime explanations more understandable,
 # #  probably have to convert features 1,2,3,9 to 0,1,2,3 because

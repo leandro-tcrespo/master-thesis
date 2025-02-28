@@ -11,6 +11,8 @@ def convert_cat_features(df):
     for col in df.columns:
         if col == 'sex':
             df[col] = df[col].apply(lambda val: "female" if val in [1] else "male")
+        if col == 'early':
+            df[col] = df[col].apply(lambda val: f'{col}_{val}')
         else:
             df[col] = df[col].apply(lambda val: f'{col}_{val}' if val in [1, 2, 3, 9] else val)
     return df
@@ -34,7 +36,7 @@ def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
 
 
 def check_state(item):
-    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|3|9)){17}$"
+    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|3|9)){17} (early_all_valid|early_[a-q])$"
     if not re.match(pattern, item):
         return False
     return True
@@ -47,10 +49,10 @@ def fit(train_data, train_labels):
         convert_cat_features(train_data_copy)
         train_labels_copy = train_labels.copy()
         diag_multi_col = train_labels_copy.pop("diag_multi")
-        train_data_copy.insert(19, "diag_multi", diag_multi_col)
+        train_data_copy.insert(20, "diag_multi", diag_multi_col)
         train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
         command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "top", "discretize", "2}3", "info",
-                   "any", "preselect", "10", "hkb_train_data.txt", "knowledge.kb"]
+                   "any", "preselect", "10", "avoid", "_9", "hkb_train_data.txt", "knowledge.kb"]
         # clear knowledge base so failed fit is not covered up by previous successful fit this is
         # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
         with open('knowledge.kb', 'w') as file:
@@ -158,11 +160,3 @@ def predict_proba(data, pred_out='predictions.txt'):
             raise ValueError(f"Invalid format for state {item}.")
     print(f"Inference successful. Check {pred_out} for all predictions.")
     return predictions
-
-
-def score(y_true, y_pred):
-    print("HKB Accuracy:", accuracy_score(y_true, y_pred))
-    print("HKB F1:", f1_score(y_true, y_pred, zero_division=0.0, average='macro'))
-    print("HKB Precision:", precision_score(y_true, y_pred, zero_division=0.0, average='macro'))
-    print("HKB Recall:", recall_score(y_true, y_pred, zero_division=0.0, average='macro'))
-    print("------------------")

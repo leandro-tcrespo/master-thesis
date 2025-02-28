@@ -8,7 +8,7 @@ from sklearn.preprocessing import OneHotEncoder
 def get_last_valid(row):
     last_valid = None
     for col in row.index:
-        if row[col] == 9:
+        if row[col] == 9 and col != 'age':
             return last_valid if last_valid else pd.NA
         last_valid = col
     return 'all_valid'

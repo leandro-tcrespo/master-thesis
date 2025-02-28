@@ -4,7 +4,6 @@ import shlex
 import subprocess
 
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
 def convert_cat_features(df):
@@ -36,7 +35,7 @@ def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
 
 
 def check_state(item):
-    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|3|9)){17} (early_all_valid|early_[a-q])$"
+    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|3|9)){17} (early_age|early_all_valid|early_[a-q])$"
     if not re.match(pattern, item):
         return False
     return True

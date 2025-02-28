@@ -1,4 +1,3 @@
-from sklearn.metrics import f1_score, precision_score, recall_score,accuracy_score
 from sklearn.model_selection import GridSearchCV
 
 param_grid = {

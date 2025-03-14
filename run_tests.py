@@ -3,6 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 from imblearn.pipeline import make_pipeline
+
+import kerasmlp
 import metrics
 from lime import lime_tabular
 from sklearn.neural_network import MLPClassifier
@@ -39,21 +41,22 @@ train_data_lime = train_data_lime.to_numpy()
 # MLP testing
 ################################################
 
-base_mlp = MLPClassifier(max_iter=500, random_state=42, early_stopping=True)
+base_mlp = kerasmlp.get_keras_model()
 smote_pipeline = make_pipeline(smote_os, enc, base_mlp)
-randomos_pipeline = make_pipeline(random_os, enc, base_mlp)
+# randomos_pipeline = make_pipeline(random_os, enc, base_mlp)
 
 print("Starting SMOTE MLP Training")
-grid_mlp_smote = mlp.fit(smote_pipeline, train_data, train_labels)
+grid_mlp_smote = kerasmlp.fit(smote_pipeline, train_data, train_labels)
+print(f"Training finished, best params: {grid_mlp_smote.best_params_}")
 predictions_mlp = grid_mlp_smote.predict(test_data)
 print("SMOTE results:")
 metrics.score(test_labels, predictions_mlp)
 
-print("Starting RandomOS MLP Training")
-grid_mlp_randomos = mlp.fit(randomos_pipeline, train_data, train_labels)
-predictions_mlp = grid_mlp_randomos.predict(test_data)
-print("RandomOS results:")
-metrics.score(test_labels, predictions_mlp)
+# print("Starting RandomOS MLP Training")
+# grid_mlp_randomos = mlp.fit(randomos_pipeline, train_data, train_labels)
+# predictions_mlp = grid_mlp_randomos.predict(test_data)
+# print("RandomOS results:")
+# metrics.score(test_labels, predictions_mlp)
 
 # # todo add categorical names to make lime explanations more understandable,
 # #  probably have to convert features 1,2,3,9 to 0,1,2,3 because
@@ -106,7 +109,8 @@ dt_pipeline = make_pipeline(smote_os, enc, base_dt)
 
 print("Starting DT Training")
 grid_dt = dt.fit(dt_pipeline, train_data, train_labels)
+print(f"Training finished, best params: {grid_dt.best_params_}")
 predictions_dt = grid_dt.predict(test_data)
 print("DT results:")
 metrics.score(test_labels, predictions_dt)
-dt.plot_dt(grid_dt)
+# dt.plot_dt(grid_dt)

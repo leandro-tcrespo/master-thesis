@@ -1,7 +1,4 @@
 import os
-
-from keras.src.optimizers.schedules import ExponentialDecay
-
 # turns off warnings about onednn custom operations being on and available CPU instructions for potential better perf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
@@ -11,6 +8,7 @@ from keras.src.optimizers import Adam, SGD, RMSprop
 from keras.src.callbacks import Callback, EarlyStopping
 from scikeras.wrappers import KerasClassifier
 from sklearn.model_selection import GridSearchCV
+from keras.src.optimizers.schedules import ExponentialDecay
 # this is to suppress warnings about retracing tf.function calls when predicting data, this probably happens because for
 # each fold in the cv a new model is created as a python object and thus tensorflow sees each model as a separate
 # entity, so it cannot use cached data and has to retrace the tf.function call for the new model, note that the

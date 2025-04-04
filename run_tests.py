@@ -33,6 +33,20 @@ def predict_proba_wrapper_hkb(original_data):
     return hkb.predict_proba(original_data_df, './output/lime_predictions_hkb.txt')
 
 
+def mean_scores_cv(model, results, output):
+    summary = {}
+    for param, values in model.param_grid.items():
+        param_name = param.replace('kerasclassifier__', '')
+        param_scores = []
+        for value in values:
+            scores = results['mean_test_score'][results[f'param_{param}'] == value]
+            param_scores.append((value, np.mean(scores)))
+        summary[param_name] = param_scores
+
+    summary_df = pd.DataFrame({k: dict(v) for k, v in summary.items()}).T
+    summary_df.to_csv(output, index=True)
+
+
 train_data, test_data, train_labels, test_labels, enc, smote_os, random_os = preprocessing.preprocess_data("./Synthetic_data.csv")
 train_data_lime = train_data.copy()
 train_data_lime = train_data_lime.to_numpy()
@@ -48,6 +62,7 @@ smote_pipeline = make_pipeline(smote_os, enc, base_mlp)
 print("Starting SMOTE MLP Training")
 grid_mlp_smote = kerasmlp.fit(smote_pipeline, train_data, train_labels)
 print(f"Training finished, best params: {grid_mlp_smote.best_params_}")
+mean_scores_cv(grid_mlp_smote, grid_mlp_smote.cv_results_, './output/mlp_cv_summary.csv')
 predictions_mlp = grid_mlp_smote.predict(test_data)
 print("SMOTE results:")
 metrics.score(test_labels, predictions_mlp)
@@ -110,6 +125,7 @@ dt_pipeline = make_pipeline(smote_os, enc, base_dt)
 print("Starting DT Training")
 grid_dt = dt.fit(dt_pipeline, train_data, train_labels)
 print(f"Training finished, best params: {grid_dt.best_params_}")
+mean_scores_cv(grid_dt, grid_dt.cv_results_, './output/dt_cv_summary.csv')
 predictions_dt = grid_dt.predict(test_data)
 print("DT results:")
 metrics.score(test_labels, predictions_dt)

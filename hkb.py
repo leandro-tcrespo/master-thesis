@@ -6,12 +6,23 @@ import subprocess
 import numpy as np
 
 
+# def convert_cat_features(df):
+#     for col in df.columns:
+#         if col == 'sex':
+#             df[col] = df[col].apply(lambda val: "female" if val in [1] else "male")
+#         elif col == 'early':
+#             df[col] = df[col].apply(lambda val: f'{col}_{val}')
+#         elif col == 'age':
+#             df[col] = df[col].apply(lambda val: val)
+#         else:
+#             df[col] = df[col].apply(lambda val: f'{col}_{val}' if val in [1, 2] else f'{col}_missing')
+#     return df
+
+
 def convert_cat_features(df):
     for col in df.columns:
         if col == 'sex':
             df[col] = df[col].apply(lambda val: "female" if val in [1] else "male")
-        elif col == 'early':
-            df[col] = df[col].apply(lambda val: f'{col}_{val}')
         elif col == 'age':
             df[col] = df[col].apply(lambda val: val)
         else:
@@ -36,8 +47,15 @@ def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
             file.write(line + '\n')
 
 
+# def check_state(item):
+#     pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|missing)){17} (early_age|early_all_valid|early_[a-q])$"
+#     if not re.match(pattern, item):
+#         return False
+#     return True
+
+
 def check_state(item):
-    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|missing)){17} (early_age|early_all_valid|early_[a-q])$"
+    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|missing)){17}$"
     if not re.match(pattern, item):
         return False
     return True
@@ -50,7 +68,7 @@ def fit(train_data, train_labels):
         convert_cat_features(train_data_copy)
         train_labels_copy = train_labels.copy()
         diag_multi_col = train_labels_copy.pop("diag_multi")
-        train_data_copy.insert(20, "diag_multi", diag_multi_col)
+        train_data_copy.insert(19, "diag_multi", diag_multi_col)
         train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
         command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
                    "any", "preselect", "10", "avoid", "_missing", "hkb_train_data.txt", "knowledge.kb"]

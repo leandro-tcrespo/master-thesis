@@ -12,10 +12,9 @@ param_grid = {
     'min_samples_split': [2, 5, 10, 20, 30],
     'min_samples_leaf': [1, 2, 4, 8, 16],
     'max_features': ['sqrt', 'log2', None],
-    'min_impurity_decrease': [0.0, 0.01, 0.1],
-    'ccp_alpha': [0.0, 0.01, 0.1],
-    'max_leaf_nodes': [10, 20, 50, 100, 200, None],
-    'class_weight': [None, 'balanced']
+    'min_impurity_decrease': [0.0, 0.01],
+    'ccp_alpha': [0.0, 0.01],
+    'max_leaf_nodes': [10, 20, 50, 100, 200, None]
 }
 new_param_grid = {'decisiontreeclassifier__' + key: param_grid[key] for key in param_grid}
 

@@ -62,33 +62,47 @@ def check_state(item):
 
 
 def fit(train_data, train_labels):
-    try:
-        print("Fitting HKB.")
-        train_data_copy = train_data.copy()
-        convert_cat_features(train_data_copy)
-        train_labels_copy = train_labels.copy()
-        diag_multi_col = train_labels_copy.pop("diag_multi")
-        train_data_copy.insert(19, "diag_multi", diag_multi_col)
-        train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
-        command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
-                   "any", "preselect", "10", "avoid", "_missing", "hkb_train_data.txt", "knowledge.kb"]
-        # clear knowledge base so failed fit is not covered up by previous successful fit this is
-        # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
-        with open('knowledge.kb', 'w') as file:
-            file.write('')
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        with open('./output/fit_output.txt', 'w') as o:
-            o.write(result.stdout)
-            o.write(result.stderr)
-        if os.path.getsize('knowledge.kb') == 0:
-            raise ValueError("The knowledge base is empty, HKB fitting probably failed."
-                             "Check './output/fitting_output.txt' for details.")
-        print("HKB fitted successfully.")
-    except subprocess.CalledProcessError as e:
-        with open('./output/fit_output.txt', 'w') as o:
-            o.write(e.stdout)
-            o.write(e.stderr)
-        raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
+    preselect_value = 18
+    while True:
+        try:
+            print(f"Fitting HKB with {preselect_value} features...")
+            train_data_copy = train_data.copy()
+            convert_cat_features(train_data_copy)
+            train_labels_copy = train_labels.copy()
+            diag_multi_col = train_labels_copy.pop("diag_multi")
+            train_data_copy.insert(19, "diag_multi", diag_multi_col)
+            train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
+            command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
+                       "any", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", "knowledge.kb"]
+            # clear knowledge base so failed fit is not covered up by previous successful fit this is
+            # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
+            with open('knowledge.kb', 'w') as file:
+                file.write('')
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            with open('./output/fit_output.txt', 'w') as o:
+                o.write(result.stdout)
+                o.write(result.stderr)
+            if os.path.getsize('knowledge.kb') == 0:
+                raise ValueError("The knowledge base is empty, HKB fitting probably failed."
+                                 "Check './output/fit_output.txt' for details.")
+            print(f"HKB fitted successfully. {preselect_value} features were used for training.")
+            break
+        except subprocess.CalledProcessError as e:
+            with open('./output/fit_output.txt', 'w') as o:
+                o.write(e.stdout)
+                o.write(e.stderr)
+            error_message = e.stdout + e.stderr
+            if "OutOfMemoryError" in error_message or "java.lang.OutOfMemoryError" in error_message:
+                print(f"HKB fitting failed due to memory issues. Retrying with {preselect_value} features...")
+                if preselect_value > 1:
+                    preselect_value -= 1
+                else:
+                    print("Can't reduce amount features anymore. Giving up.")
+                    raise ValueError("HKB fitting failed due to memory issues. "
+                                     "Check './output/fit_output.txt' for details.")
+
+            else:
+                raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
 
 
 def intekrator_infer(item, pred_out):

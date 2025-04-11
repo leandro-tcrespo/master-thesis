@@ -1,5 +1,6 @@
 import pandas as pd
-from imblearn.over_sampling import SMOTENC, RandomOverSampler
+from imblearn.over_sampling import SMOTENC
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
@@ -30,9 +31,7 @@ def preprocess_data(csv_path):
                                         ("AgeScaler", MinMaxScaler(), ['age'])],
                             sparse_threshold=0, verbose_feature_names_out=False)
 
-    scaler = MinMaxScaler()
-
     smote_os = SMOTENC(random_state=42, k_neighbors=5, categorical_features=categorical_features)
-    random_os = RandomOverSampler(random_state=42)
+    us = RandomUnderSampler(random_state=42, sampling_strategy='majority')
 
-    return train_data, test_data, train_labels, test_labels, enc, smote_os, random_os
+    return train_data, test_data, train_labels, test_labels, enc, smote_os, us

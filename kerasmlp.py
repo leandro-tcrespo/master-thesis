@@ -17,11 +17,20 @@ from keras.src.optimizers.schedules import ExponentialDecay
 tf.get_logger().setLevel('ERROR')
 
 
-lr_schedule = ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay_rate=0.9)
+schedules = [ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay_rate=0.8),
+             ExponentialDecay(initial_learning_rate=0.001, decay_steps=100, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.001, decay_steps=100, decay_rate=0.8),
+             ExponentialDecay(initial_learning_rate=0.001, decay_steps=200, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.001, decay_steps=200, decay_rate=0.8),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=50, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=50, decay_rate=0.8),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=100, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=100, decay_rate=0.8),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=200, decay_rate=0.9),
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=200, decay_rate=0.8)]
 
-adam_with_decay = Adam(learning_rate=lr_schedule)
-sgd_with_decay = SGD(learning_rate=lr_schedule, momentum=0.9)
-rmsprop_with_decay = RMSprop(learning_rate=lr_schedule)
+adam_with_decay = Adam
 
 early_stopping = EarlyStopping(
     monitor='loss',
@@ -31,16 +40,11 @@ early_stopping = EarlyStopping(
 )
 
 param_grid = {
-    'kerasclassifier__optimizer': [adam_with_decay, sgd_with_decay, rmsprop_with_decay],
+    'kerasclassifier__optimizer__learning_rate': schedules,
     'kerasclassifier__dropout_rate': [0.1, 0.15, 0.2],
     'kerasclassifier__batch_size': [32, 64],
-    'kerasclassifier__use_batchnorm1': [True, False],
-    'kerasclassifier__use_dropout1': [True, False],
-    'kerasclassifier__use_batchnorm2': [True, False],
-    'kerasclassifier__use_dropout2': [True, False],
-    'kerasclassifier__use_batchnorm3': [True, False],
-    'kerasclassifier__use_dropout3': [True, False],
-    'kerasclassifier__activation': ['relu', 'leaky_relu', 'elu', 'silu'],
+    'kerasclassifier__activation': ['relu', 'leaky_relu'],
+    'kerasclassifier__num_layers': [2, 3],
 }
 
 
@@ -55,9 +59,10 @@ def fit(model, train_data, train_labels):
 # function that gets called by scikeras to build model
 def create_model(meta, dropout_rate, activation,
                  units1, units2, units3,
-                 use_batchnorm1, use_dropout1,
-                 use_batchnorm2, use_dropout2,
-                 use_batchnorm3, use_dropout3):
+                 num_layers,
+                 use_batchnorm1=True, use_dropout1=True,
+                 use_batchnorm2=False, use_dropout2=True,
+                 use_batchnorm3=True, use_dropout3=True,):
     # meta is a dict with attributes of kerasclassifier after it is initialized, containing info like input shape,
     # number of classes etc, it is created after fit is called on the kerasclassifier and before the actual fitting
     n_features_in_ = meta["n_features_in_"]
@@ -78,12 +83,13 @@ def create_model(meta, dropout_rate, activation,
     if use_dropout2:
         model.add(Dropout(dropout_rate))
 
-    model.add(Dense(units3))
-    if use_batchnorm3:
-        model.add(BatchNormalization())
-    model.add(tf.keras.layers.Activation(activation))
-    if use_dropout3:
-        model.add(Dropout(dropout_rate))
+    if num_layers == 3:
+        model.add(Dense(units3))
+        if use_batchnorm3:
+            model.add(BatchNormalization())
+        model.add(tf.keras.layers.Activation(activation))
+        if use_dropout3:
+            model.add(Dropout(dropout_rate))
 
     model.add(Dense(4, activation='softmax'))
     return model
@@ -111,8 +117,9 @@ def get_keras_model():
         random_state=42,
         activation='relu',
         dropout_rate=0.2,
-        optimizer=Adam,
-        callbacks=[early_stopping],
+        optimizer=adam_with_decay,
+        num_layers=2,
+        callbacks=early_stopping,
         # fit__callbacks=[PrintModelDetails(),],
         loss='sparse_categorical_crossentropy',
     )

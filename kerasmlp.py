@@ -9,6 +9,7 @@ from keras.src.callbacks import Callback, EarlyStopping
 from scikeras.wrappers import KerasClassifier
 from sklearn.model_selection import GridSearchCV
 from keras.src.optimizers.schedules import ExponentialDecay
+from keras import backend
 # this is to suppress warnings about retracing tf.function calls when predicting data, this probably happens because for
 # each fold in the cv a new model is created as a python object and thus tensorflow sees each model as a separate
 # entity, so it cannot use cached data and has to retrace the tf.function call for the new model, note that the
@@ -28,7 +29,8 @@ schedules = [ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay
              ExponentialDecay(initial_learning_rate=0.01, decay_steps=100, decay_rate=0.9),
              ExponentialDecay(initial_learning_rate=0.01, decay_steps=100, decay_rate=0.8),
              ExponentialDecay(initial_learning_rate=0.01, decay_steps=200, decay_rate=0.9),
-             ExponentialDecay(initial_learning_rate=0.01, decay_steps=200, decay_rate=0.8)]
+             ExponentialDecay(initial_learning_rate=0.01, decay_steps=200, decay_rate=0.8)
+             ]
 
 adam_with_decay = Adam
 
@@ -63,6 +65,7 @@ def create_model(meta, dropout_rate, activation,
                  use_batchnorm1=True, use_dropout1=True,
                  use_batchnorm2=False, use_dropout2=True,
                  use_batchnorm3=True, use_dropout3=True,):
+    backend.clear_session()
     # meta is a dict with attributes of kerasclassifier after it is initialized, containing info like input shape,
     # number of classes etc, it is created after fit is called on the kerasclassifier and before the actual fitting
     n_features_in_ = meta["n_features_in_"]
@@ -119,8 +122,8 @@ def get_keras_model():
         dropout_rate=0.2,
         optimizer=adam_with_decay,
         num_layers=2,
-        callbacks=early_stopping,
+        # callbacks=early_stopping,
         # fit__callbacks=[PrintModelDetails(),],
-        loss='sparse_categorical_crossentropy',
+        loss='sparse_categorical_crossentropy'
     )
     return keras_estimator

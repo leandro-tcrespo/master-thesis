@@ -1,6 +1,7 @@
 import pandas as pd
-from imblearn.over_sampling import SMOTENC
-from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTENC, RandomOverSampler
+from imblearn.combine import SMOTEENN, SMOTETomek
+from imblearn.under_sampling import TomekLinks, EditedNearestNeighbours
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
@@ -23,6 +24,7 @@ def preprocess_data(csv_path):
     # X_with_early.loc[:, 'early'] = X_with_early.apply(get_last_valid, axis=1)
     features = X.columns
     categorical_features = [name for name in features if name != 'age']
+    categorical_indices = [X.columns.get_loc(col) for col in categorical_features]
 
     datasets = train_test_split(X, y, test_size=0.25, random_state=42)
     train_data, test_data, train_labels, test_labels = datasets
@@ -31,7 +33,11 @@ def preprocess_data(csv_path):
                                         ("AgeScaler", MinMaxScaler(), ['age'])],
                             sparse_threshold=0, verbose_feature_names_out=False)
 
-    smote_os = SMOTENC(random_state=42, k_neighbors=5, categorical_features=categorical_features)
-    us = RandomUnderSampler(random_state=42, sampling_strategy='majority')
+    smote_os = SMOTENC(random_state=42, categorical_features=categorical_indices)
+    smote_enn = SMOTEENN(random_state=42, smote=smote_os)
+    smote_tomek = SMOTETomek(random_state=42, smote=smote_os)
+    ros = RandomOverSampler(random_state=42)
+    tomek = TomekLinks(sampling_strategy='all')
 
-    return train_data, test_data, train_labels, test_labels, enc, smote_os, us
+
+    return train_data, test_data, train_labels, test_labels, enc, smote_enn, smote_tomek, ros, tomek, smote_os

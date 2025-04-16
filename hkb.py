@@ -62,7 +62,7 @@ def check_state(item):
 
 
 def fit(train_data, train_labels):
-    preselect_value = 18
+    preselect_value = 19
     while True:
         try:
             print(f"Fitting HKB with {preselect_value} features...")

@@ -33,11 +33,13 @@ def preprocess_data(csv_path):
                                         ("AgeScaler", MinMaxScaler(), ['age'])],
                             sparse_threshold=0, verbose_feature_names_out=False)
 
+    dt_enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features)],
+                            sparse_threshold=0, verbose_feature_names_out=False, remainder='passthrough')
+
     smote_os = SMOTENC(random_state=42, categorical_features=categorical_indices)
     smote_enn = SMOTEENN(random_state=42, smote=smote_os)
     smote_tomek = SMOTETomek(random_state=42, smote=smote_os)
     ros = RandomOverSampler(random_state=42)
     tomek = TomekLinks(sampling_strategy='all')
 
-
-    return train_data, test_data, train_labels, test_labels, enc, smote_enn, smote_tomek, ros, tomek, smote_os
+    return train_data, test_data, train_labels, test_labels, enc, dt_enc, smote_enn, smote_tomek, ros, tomek, smote_os

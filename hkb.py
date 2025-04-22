@@ -61,7 +61,7 @@ def check_state(item):
     return True
 
 
-def fit(train_data, train_labels):
+def fit(train_data, train_labels, cluster_size, kb):
     preselect_value = 19
     while True:
         try:
@@ -72,17 +72,17 @@ def fit(train_data, train_labels):
             diag_multi_col = train_labels_copy.pop("diag_multi")
             train_data_copy.insert(19, "diag_multi", diag_multi_col)
             train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
-            command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", "2}3", "info",
-                       "any", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", "knowledge.kb"]
+            command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
+                       "any", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", kb]
             # clear knowledge base so failed fit is not covered up by previous successful fit this is
             # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
-            with open('knowledge.kb', 'w') as file:
+            with open(kb, 'w') as file:
                 file.write('')
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             with open('./output/fit_output.txt', 'w') as o:
                 o.write(result.stdout)
                 o.write(result.stderr)
-            if os.path.getsize('knowledge.kb') == 0:
+            if os.path.getsize(kb) == 0:
                 raise ValueError("The knowledge base is empty, HKB fitting probably failed."
                                  "Check './output/fit_output.txt' for details.")
             print(f"HKB fitted successfully. {preselect_value} features were used for training.")
@@ -105,11 +105,11 @@ def fit(train_data, train_labels):
                 raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
 
 
-def intekrator_infer(item, pred_out):
+def intekrator_infer(item, pred_out, kb):
     try:
         command = (["java", "-jar", "InteKRator.jar", "-infer", "why"]
                    + shlex.split(item)
-                   + ["knowledge.kb", "inference.txt"])
+                   + [kb, "inference.txt"])
         # clear inference file so failed inference is not covered up by previous successful inference, this is
         # necessary since InteKRator may fail without raising a CalledProcessError and leave inference.txt unchanged
         with open('inference.txt', 'w') as file:
@@ -136,7 +136,7 @@ def intekrator_infer(item, pred_out):
         raise ValueError(f"Inference failed for state {item}. Check './output/infer_output.txt' for details.")
 
 
-def predict(data, pred_out='predictions.txt'):
+def predict(data, kb, pred_out='predictions.txt'):
     print("Starting inference from HKB.")
     with open(pred_out, 'w') as file:
         file.write('')
@@ -147,7 +147,7 @@ def predict(data, pred_out='predictions.txt'):
     data_to_txt(formatted_data)
     for item in formatted_data:
         if check_state(item):
-            line = intekrator_infer(item, pred_out)
+            line = intekrator_infer(item, pred_out, kb)
             prediction = line.split('   (')[0]
             predictions = np.append(predictions, prediction)
             with open(pred_out, 'a') as append_file:

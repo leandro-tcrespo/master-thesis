@@ -244,7 +244,7 @@ metrics.score(test_labels, predictions)
 
 base_dt = DecisionTreeClassifier(random_state=42)
 base_dt_weighted = DecisionTreeClassifier(random_state=42, class_weight='balanced')
-dt_pipeline_without_sampling = make_pipeline(clone(dt_enc), base_dt_weighted)
+dt_pipeline_without_sampling = make_pipeline(clone(dt_enc), clone(base_dt_weighted))
 dt_pipeline = make_pipeline(clone(smote_os), clone(dt_enc), clone(base_dt))
 smote_enn_pipeline_dt = make_pipeline(clone(smote_enn), clone(dt_enc), clone(base_dt))
 smote_tomek_pipeline_dt = make_pipeline(clone(smote_tomek), clone(dt_enc), clone(base_dt))

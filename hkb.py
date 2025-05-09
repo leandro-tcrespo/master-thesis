@@ -106,6 +106,11 @@ def fit(train_data, train_labels, cluster_size, kb):
                 raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
 
 
+def check(kb, outfile):
+    command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-check", "details", "hkb_train_data.txt", kb, outfile]
+    subprocess.run(command, capture_output=True, text=True, check=True)
+
+
 def intekrator_infer(item, pred_out, kb):
     try:
         command = (["java", "-jar", "InteKRator.jar", "-infer", "why"]

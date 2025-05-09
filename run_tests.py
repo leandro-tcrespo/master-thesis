@@ -213,10 +213,12 @@ hkb.fit(train_data, train_labels, "2}2", "hkb_2.kb")
 predictions = hkb.predict(test_data, "hkb_2.kb", './output/predictions_2.txt')
 print("HKB results (2 clusters):")
 metrics.score(test_labels, predictions)
+hkb.check("hkb_2.kb", "./output/hkb_2_train_accuracy.txt")
 hkb.fit(train_data, train_labels, "2}4", "hkb_4.kb")
 predictions = hkb.predict(test_data, "hkb_4.kb", './output/predictions_4.txt')
 print("HKB results (4 clusters):")
 metrics.score(test_labels, predictions)
+hkb.check("hkb_4.kb", "./output/hkb_4_train_accuracy.txt")
 
 # explainer_hkb = lime_tabular.LimeTabularExplainer(
 #     train_data_lime,

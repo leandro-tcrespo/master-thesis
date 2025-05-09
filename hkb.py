@@ -72,6 +72,7 @@ def fit(train_data, train_labels, cluster_size, kb):
             diag_multi_col = train_labels_copy.pop("diag_multi")
             train_data_copy.insert(19, "diag_multi", diag_multi_col)
             train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
+            # discretize 2}Alter_jung,Alter_mittel,Alter_alt info 2
             command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
                        "any", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", kb]
             # clear knowledge base so failed fit is not covered up by previous successful fit this is

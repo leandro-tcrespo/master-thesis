@@ -4,7 +4,7 @@ from sklearn.tree import plot_tree
 
 param_grid = {
     'criterion': ['gini', 'entropy'],
-    'max_depth': [3, 5, 7, 10, 15, None],
+    'max_depth': [3, 5, 7],
     'min_samples_split': [2, 5, 10, 20, 30],
     'min_samples_leaf': [1, 2, 4, 8, 16],
     'max_features': ['sqrt', 'log2', None],

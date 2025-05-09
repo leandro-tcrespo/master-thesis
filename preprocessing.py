@@ -5,6 +5,7 @@ from imblearn.under_sampling import TomekLinks, EditedNearestNeighbours
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+from sklearn.impute import SimpleImputer
 
 
 def get_last_valid(row):
@@ -41,5 +42,7 @@ def preprocess_data(csv_path):
     smote_tomek = SMOTETomek(random_state=42, smote=smote_os)
     ros = RandomOverSampler(random_state=42)
     tomek = TomekLinks(sampling_strategy='all')
+    imputer = SimpleImputer(strategy='most_frequent').set_output(transform='pandas')
 
-    return train_data, test_data, train_labels, test_labels, enc, dt_enc, smote_enn, smote_tomek, ros, tomek, smote_os
+    return (train_data, test_data, train_labels, test_labels, enc, dt_enc, imputer,
+            smote_enn, smote_tomek, ros, tomek, smote_os)

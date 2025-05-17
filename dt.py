@@ -4,7 +4,7 @@ from sklearn.tree import plot_tree
 
 param_grid = {
     'criterion': ['gini', 'entropy'],
-    'max_depth': [3, 5, 7],
+    'max_depth': [3, 5, 7, 10, 15, None],
     'min_samples_split': [2, 5, 10, 20, 30],
     'min_samples_leaf': [1, 2, 4, 8, 16],
     'max_features': ['sqrt', 'log2', None],
@@ -32,6 +32,19 @@ def plot_dt(grid_dt, out_file):
         filled=True,
         rounded=True
     )
-
     plt.savefig(out_file, dpi=300, bbox_inches="tight")  # Save as PNG
     plt.show()
+
+
+def plot_dt_without_grid(dt, out_file):
+    plt.figure(figsize=(15, 10))
+    plot_tree(
+        dt['decisiontreeclassifier'],
+        feature_names=dt['columntransformer'].get_feature_names_out(),
+        class_names=dt.classes_.tolist(),
+        filled=True,
+        rounded=True
+    )
+
+    plt.savefig(out_file, dpi=300, bbox_inches="tight")  # Save as PNG
+    # plt.show()

@@ -41,28 +41,27 @@ def convert_num_features(data):
     return formatted_data
 
 
+# converts list to a text file in the right data format for InteKRator
 def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
     with open(outfile, 'w') as file:
         for line in formatted_data:
             file.write(line + '\n')
 
 
-# def check_state(item):
-#     pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|missing)){17} (early_age|early_all_valid|early_[a-q])$"
-#     if not re.match(pattern, item):
-#         return False
-#     return True
-
-
+# this checks if samples that are passed to InteKRator are in the right format, technically this makes duplicate
+# features possible (male 50 a_1 a_1 b_2 ...) but usually this should not happen, this method is mostly for making sure
+# that the data passed is not totally wrong
 def check_state(item):
-    pattern = r"^(female|male) S2:[0-9]+(\.[0-9]+)?( [a-q]_(1|2|missing)){17}$"
-    if not re.match(pattern, item):
+    parts = item.split()
+    if parts[0] not in ["female", "male"] or not parts[1].startswith("S2:"):
         return False
+    for part in parts[2:]:
+        if not re.match(r"^[a-q]_(1|2|missing)$", part):
+            return False
     return True
 
 
-def fit(train_data, train_labels, cluster_size, kb):
-    preselect_value = 19
+def fit(train_data, train_labels, cluster_size, kb, preselect_value=19):
     while True:
         try:
             print(f"Fitting HKB with {preselect_value} features...")
@@ -72,9 +71,8 @@ def fit(train_data, train_labels, cluster_size, kb):
             diag_multi_col = train_labels_copy.pop("diag_multi")
             train_data_copy.insert(19, "diag_multi", diag_multi_col)
             train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
-            # discretize 2}Alter_jung,Alter_mittel,Alter_alt info 2
             command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
-                       "any", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", kb]
+                       "2", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", kb]
             # clear knowledge base so failed fit is not covered up by previous successful fit this is
             # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
             with open(kb, 'w') as file:

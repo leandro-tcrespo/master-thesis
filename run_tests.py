@@ -20,6 +20,7 @@ import preprocessing
 
 os.makedirs('./output', exist_ok=True)
 
+
 def predict_proba_wrapper_mlp(original_data):
     original_data_copy = pd.DataFrame(original_data, columns=train_data.columns)
     return grid_mlp_smote.predict_proba(original_data_copy)

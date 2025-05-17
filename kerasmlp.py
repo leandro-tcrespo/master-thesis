@@ -37,6 +37,7 @@ param_grid = {
 }
 
 
+# fit method for hyperparameter tuning through grid search
 def fit(model, train_data, train_labels):
     grid_model = GridSearchCV(model, param_grid=param_grid, cv=5, n_jobs=-1, scoring='f1_macro',
                               error_score='raise')
@@ -53,7 +54,6 @@ def create_model(meta, dropout_rate, activation,
                  use_batchnorm2=False, use_dropout2=True,
                  use_batchnorm3=True, use_dropout3=True,
                  l2=0.0):
-    backend.clear_session()
     # meta is a dict with attributes of kerasclassifier after it is initialized, containing info like input shape,
     # number of classes etc, it is created after fit is called on the kerasclassifier and before the actual fitting
     n_features_in_ = meta["n_features_in_"]
@@ -103,7 +103,6 @@ def get_keras_model():
         epochs=100,
         batch_size=32,
         verbose=0,
-        random_state=42,
         activation='relu',
         dropout_rate=0.1,
         optimizer=Adam,

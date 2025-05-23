@@ -1,10 +1,14 @@
 import copy
 import os
+
+from imblearn.under_sampling import TomekLinks
+from sklearn.preprocessing import MinMaxScaler
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import numpy as np
 import pandas as pd
 from imblearn.pipeline import make_pipeline
-from sklearn.base import clone
+from sklearn.base import clone, BaseEstimator, TransformerMixin
 
 import kerasmlp
 import metrics
@@ -58,168 +62,180 @@ def mean_scores_cv(model, results, output):
     summary_df.to_csv(output, index=False)
 
 
-train_data, test_data, train_labels, test_labels, enc, dt_enc, imputer, smote_enn, smote_tomek, ros, tomek, smote_os = preprocessing.preprocess_data("./Synthetic_data.csv")
+(train_data, test_data, train_labels, test_labels, enc,
+ ros, tomek, smote_os, seed, enn) = (preprocessing.preprocess_data("./Synthetic_data.csv"))
 train_data_lime = train_data.copy()
 train_data_lime = train_data_lime.to_numpy()
 
-selected_features = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q']
 
-# Create a copy of your dataframe to avoid modifying the original
-train_data_nanned = train_data.copy()
-test_data_nanned = test_data.copy()
-
-for feature in selected_features:
-    train_data_nanned[feature] = train_data_nanned[feature].replace([3, 9], np.nan)
-    test_data_nanned[feature] = test_data_nanned[feature].replace([3, 9], np.nan)
-
-#imputed_data = imputer.fit_transform(train_data_nanned)
-
-
-class CombinedRosTomek:
-    def __init__(self, ros, tomek):
-        self.ros = clone(ros)
-        self.tomek = clone(tomek)
-
-    def fit_resample(self, X, y):
-        X_res, y_res = self.ros.fit_resample(X, y)
-        X_res, y_res = self.tomek.fit_resample(X_res, y_res)
-        return X_res, y_res
-
-
-label_count = train_labels["diag_multi"].value_counts()
-print("Label counts before resampling")
-print(label_count)
-
-
-def count_labels(sampler, train_d, train_l):
-    sampler_copy = copy.deepcopy(sampler)
-    train_d_resampled, train_l_resampled = sampler_copy.fit_resample(train_d, train_l)
-    train_l_resampled = pd.DataFrame(train_l_resampled, columns=["diag_multi"])
-    resampled_counts = train_l_resampled["diag_multi"].value_counts()
+def count_labels(enc, train_d, train_l, os=None, us=None):
+    train_l_res = train_l
+    if os is not None:
+        os = clone(os)
+        train_d_res, train_l_res = os.fit_resample(train_d, train_l)
+    if us is not None:
+        enc = clone(enc)
+        us = clone(us)
+        train_d_enc = enc.fit_transform(train_d_res, train_l_res)
+        train_d_res, train_l_res = us.fit_resample(train_d_enc, train_l_res)
+    train_l_res = pd.DataFrame(train_l_res, columns=["diag_multi"])
+    resampled_counts = train_l_res["diag_multi"].value_counts()
     print("Resampled label counts:")
     print(resampled_counts)
 
+print("\nNo Resampling:")
+count_labels(enc, train_data, train_labels)
 print("\nSMOTE:")
-count_labels(smote_enn, train_data, train_labels)
+count_labels(enc, train_data, train_labels, smote_os)
 print("\nSMOTEENN:")
-count_labels(smote_enn, train_data, train_labels)
+count_labels(enc, train_data, train_labels, smote_os, enn)
 print("\nSMOTETOMEK:")
-count_labels(smote_tomek, train_data, train_labels)
+count_labels(enc, train_data, train_labels, smote_os, tomek)
 print("\nROS+TOMEK:")
-count_labels(CombinedRosTomek(ros=ros, tomek=tomek), train_data, train_labels)
+count_labels(enc, train_data, train_labels, ros, tomek)
 
 ################################################
 # MLP testing
 ################################################
 
 base_mlp = kerasmlp.get_keras_model()
-smote_pipeline_baseline = make_pipeline(clone(enc), clone(base_mlp))
-# smote_pipeline = make_pipeline(clone(smote_os), clone(enc), clone(base_mlp))
+# smote_pipeline_baseline = make_pipeline(clone(enc), clone(base_mlp))
+smote_pipeline = make_pipeline(clone(smote_os), clone(enc), clone(base_mlp))
+smote_enn_pipeline = make_pipeline(clone(smote_os), clone(enc), clone(enn), clone(base_mlp))
+smote_tomek_pipeline = make_pipeline(clone(smote_os), clone(enc), clone(tomek), clone(base_mlp))
+ros_tomek_pipeline = make_pipeline(clone(ros), clone(enc), clone(tomek), clone(base_mlp))
 
-# smote_enn_pipeline = make_pipeline(clone(smote_enn), clone(enc), clone(base_mlp))
-smote_tomek_pipeline = make_pipeline(clone(imputer), clone(smote_tomek), clone(enc), clone(base_mlp))
-# ros_tomek_pipeline = make_pipeline(CombinedRosTomek(ros=ros,tomek=tomek), clone(enc), clone(base_mlp))
-
-# print("Starting SMOTE MLP Training...")
-# grid_mlp_smote = kerasmlp.fit(smote_pipeline, train_data, train_labels)
-# print(f"Training finished, best params: {grid_mlp_smote.best_params_}")
-# mean_scores_cv(grid_mlp_smote, grid_mlp_smote.cv_results_, './output/mlp_cv_summary_smote.csv')
-# predictions_mlp = grid_mlp_smote.predict(test_data)
-# print("SMOTE MLP results:")
-# metrics.score(test_labels, predictions_mlp)
-
-print("Starting Baseline MLP Training (no oversampling, no imputation, only ohe and age scaling)...")
-grid_mlp_baseline = kerasmlp.fit(smote_pipeline_baseline, train_data, train_labels)
-print(f"Training finished, best params: {grid_mlp_baseline.best_params_}")
-mean_scores_cv(grid_mlp_baseline, grid_mlp_baseline.cv_results_, './output/mlp_cv_summary_baseline.csv')
-predictions_mlp = grid_mlp_baseline.predict(test_data)
+print("Starting SMOTE MLP Training...")
+grid_mlp_smote = kerasmlp.fit(smote_pipeline, train_data, train_labels)
+print(f"Training finished, best params: {grid_mlp_smote.best_params_}")
+mean_scores_cv(grid_mlp_smote, grid_mlp_smote.cv_results_, './output/mlp_cv_summary_smote.csv')
+predictions_mlp = grid_mlp_smote.predict(test_data)
 print("SMOTE MLP results:")
 metrics.score(test_labels, predictions_mlp)
 
-# print("Starting SMOTEENN MLP Training...")
-# grid_mlp_smote_enn = kerasmlp.fit(smote_enn_pipeline, train_data, train_labels)
-# print(f"Training finished, best params: {grid_mlp_smote_enn.best_params_}")
-# mean_scores_cv(grid_mlp_smote_enn, grid_mlp_smote_enn.cv_results_, './output/mlp_cv_summary_smoteenn.csv')
-# predictions_mlp = grid_mlp_smote_enn.predict(test_data)
-# print("SMOTEENN MLP results:")
-# metrics.score(test_labels, predictions_mlp)
-#
-print("Starting SMOTETOMEK MLP Training with imputation...")
-grid_mlp_smote_tomek = kerasmlp.fit(smote_tomek_pipeline, train_data_nanned, train_labels)
+# print("Starting Baseline MLP Training (only ohe and age scaling)...")
+# grid_mlp_baseline = kerasmlp.fit(smote_pipeline_baseline, train_data, train_labels)
+# print(f"Training finished, best params: {grid_mlp_baseline.best_params_}")
+# baseline_mlp = grid_mlp_baseline.predict(test_data)
+# print("Baseline MLP results:")
+# metrics.score(test_labels, baseline_mlp)
+
+print("Starting SMOTEENN MLP Training...")
+grid_mlp_smote_enn = kerasmlp.fit(smote_enn_pipeline, train_data, train_labels)
+print(f"Training finished, best params: {grid_mlp_smote_enn.best_params_}")
+mean_scores_cv(grid_mlp_smote_enn, grid_mlp_smote_enn.cv_results_, './output/mlp_cv_summary_smoteenn.csv')
+smote_enn_mlp = grid_mlp_smote_enn.predict(test_data)
+print("SMOTEENN MLP results:")
+metrics.score(test_labels, smote_enn_mlp)
+
+print("Starting SMOTETOMEK MLP Training...")
+grid_mlp_smote_tomek = kerasmlp.fit(smote_tomek_pipeline, train_data, train_labels)
 print(f"Training finished, best params: {grid_mlp_smote_tomek.best_params_}")
 mean_scores_cv(grid_mlp_smote_tomek, grid_mlp_smote_tomek.cv_results_, './output/mlp_cv_summary_smotetomek.csv')
-predictions_mlp = grid_mlp_smote_tomek.predict(test_data_nanned)
+smote_tomek_mlp = grid_mlp_smote_tomek.predict(test_data)
 print("SMOTETOMEK MLP results:")
-metrics.score(test_labels, predictions_mlp)
+metrics.score(test_labels, smote_tomek_mlp)
+
+print("Starting ROSTOMEK MLP Training...")
+grid_mlp_ros_tomek = kerasmlp.fit(ros_tomek_pipeline, train_data, train_labels)
+print(f"Training finished, best params: {grid_mlp_ros_tomek.best_params_}")
+mean_scores_cv(grid_mlp_ros_tomek, grid_mlp_ros_tomek.cv_results_, './output/mlp_cv_summary_rostomek.csv')
+ros_tomek_mlp = grid_mlp_ros_tomek.predict(test_data)
+print("ROSTOMEK MLP results:")
+metrics.score(test_labels, ros_tomek_mlp)
 #
-# print("Starting ROSTOMEK MLP Training...")
-# grid_mlp_ros_tomek = kerasmlp.fit(ros_tomek_pipeline, train_data, train_labels)
-# print(f"Training finished, best params: {grid_mlp_ros_tomek.best_params_}")
-# mean_scores_cv(grid_mlp_ros_tomek, grid_mlp_ros_tomek.cv_results_, './output/mlp_cv_summary_rostomek.csv')
-# predictions_mlp = grid_mlp_ros_tomek.predict(test_data)
-# print("ROSTOMEK MLP results:")
-# metrics.score(test_labels, predictions_mlp)
-
-# # todo add categorical names to make lime explanations more understandable,
-# #  probably have to convert features 1,2,3,9 to 0,1,2,3 because
-# #  categorical names dict is accessed by looking at index indicated by feature value i in column x: names[x][i]
-# explainer_mlp = lime_tabular.LimeTabularExplainer(
-#     train_data_lime,
-#     categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-#     feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
-#     class_names=grid_mlp_smote.classes_.tolist(),
-#     verbose=True,
-#     random_state=42
-# )
-# exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrapper_mlp, top_labels=1, num_features=19)
-# fi_values_dict = exp_mlp.as_list(exp_mlp.available_labels()[0])
-# fi_values = np.array([fi_value for _,fi_value in fi_values_dict])
-# print(metrics.compute_complexity(fi_values))
-# baseline = [1]*19
-# baseline = np.asarray(baseline)
-# print(metrics.faithfulness_corr(model=grid_mlp_smote, input_sample=test_data.values[0], feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'], attributions=fi_values, baseline=baseline, label=0))
-# fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
-# fig.show()
-
-################################################
-# HKB testing
-################################################
-
-###### example of how oversampling was tested with hkbs ########
-# smote_enn_copy = clone(smote_enn)
+# # # todo add categorical names to make lime explanations more understandable,
+# # #  probably have to convert features 1,2,3,9 to 0,1,2,3 because
+# # #  categorical names dict is accessed by looking at index indicated by feature value i in column x: names[x][i]
+# # explainer_mlp = lime_tabular.LimeTabularExplainer(
+# #     train_data_lime,
+# #     categorical_features=[0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+# #     feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'],
+# #     class_names=grid_mlp_smote.classes_.tolist(),
+# #     verbose=True,
+# #     random_state=42
+# # )
+# # exp_mlp = explainer_mlp.explain_instance(test_data.values[0], predict_proba_wrapper_mlp, top_labels=1, num_features=19)
+# # fi_values_dict = exp_mlp.as_list(exp_mlp.available_labels()[0])
+# # fi_values = np.array([fi_value for _,fi_value in fi_values_dict])
+# # print(metrics.compute_complexity(fi_values))
+# # baseline = [1]*19
+# # baseline = np.asarray(baseline)
+# # print(metrics.faithfulness_corr(model=grid_mlp_smote, input_sample=test_data.values[0], feature_names=['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q'], attributions=fi_values, baseline=baseline, label=0))
+# # fig = lime_utils.plot_lime(exp_mlp, './output/lime_plot_mlp.png')
+# # fig.show()
 #
-# train_data_smote_enn, train_labels_smote_enn = smote_enn_copy.fit_resample(train_data, train_labels)
+# ################################################
+# # HKB testing
+# ################################################
 #
-# # smoteenn
-# hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}3", "smoteenn_3.kb")
-# predictions = hkb.predict(test_data, "smoteenn_3.kb", './output/predictions_smoteenn_3.txt')
-# print("HKB with SMOTEENN results (3 clusters):")
-# metrics.score(test_labels, predictions)
-# hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}6", "smoteenn_6.kb")
-# predictions = hkb.predict(test_data, "smoteenn_6.kb", './output/predictions_smoteenn_6.txt')
-# print("HKB with SMOTEENN results (6 clusters):")
-# metrics.score(test_labels, predictions)
-# hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}9", "smoteenn_9.kb")
-# predictions = hkb.predict(test_data, "smoteenn_9.kb", './output/predictions_smoteenn_9.txt')
-# print("HKB with SMOTEENN results (9 clusters):")
-# metrics.score(test_labels, predictions)
-################################################################
+# ###### example of how oversampling was tested with hkbs ########
+#
+# #
+# # # smoteenn
+#
+# # hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}6", "smoteenn_6.kb")
+# # predictions = hkb.predict(test_data, "smoteenn_6.kb", './output/predictions_smoteenn_6.txt')
+# # print("HKB with SMOTEENN results (6 clusters):")
+# # metrics.score(test_labels, predictions)
+# # hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}9", "smoteenn_9.kb")
+# # predictions = hkb.predict(test_data, "smoteenn_9.kb", './output/predictions_smoteenn_9.txt')
+# # print("HKB with SMOTEENN results (9 clusters):")
+# # metrics.score(test_labels, predictions)
+# ################################################################
+#
+# # no sampling
+# # hkb.fit(train_data, train_labels, "2}3", "hkb_3.kb")
+# # predictions = hkb.predict(test_data, "hkb_3.kb", './output/predictions_3.txt')
+# # print("HKB results (3 clusters):")
+# # metrics.score(test_labels, predictions)
 
-# no sampling
-# hkb.fit(train_data, train_labels, "2}3", "hkb_3.kb")
-# predictions = hkb.predict(test_data, "hkb_3.kb", './output/predictions_3.txt')
-# print("HKB results (3 clusters):")
-# metrics.score(test_labels, predictions)
-hkb.fit(train_data, train_labels, "2}2", "hkb_2.kb")
-predictions = hkb.predict(test_data, "hkb_2.kb", './output/predictions_2.txt')
-print("HKB results (2 clusters):")
+
+def resample_data(X, y, os, us=None):
+    os = clone(os)
+    X_res, y_res = os.fit_resample(X, y)
+    if us is not None:
+        us = clone(us)
+        X_res, y_res = us.fit_resample(X_res, y_res)
+    return X_res, y_res
+
+
+train_data_smote, train_labels_smote = resample_data(train_data, train_labels, smote_os)
+train_data_smote_enn, train_labels_smote_enn = resample_data(train_data, train_labels, smote_os, enn)
+train_data_smote_tomek, train_labels_smote_tomek = resample_data(train_data, train_labels, smote_os, tomek)
+train_data_ros_tomek, train_labels_ros_tomek = resample_data(train_data, train_labels, ros, tomek)
+
+
+hkb.fit(train_data_smote, train_labels_smote, "2}3", "smote_3.kb")
+predictions = hkb.predict(test_data, "smote_3.kb", './output/predictions_smote_3.txt')
+print("HKB with SMOTE results (3 clusters):")
 metrics.score(test_labels, predictions)
-hkb.check("hkb_2.kb", "./output/hkb_2_train_accuracy.txt")
-hkb.fit(train_data, train_labels, "2}4", "hkb_4.kb")
-predictions = hkb.predict(test_data, "hkb_4.kb", './output/predictions_4.txt')
-print("HKB results (4 clusters):")
-metrics.score(test_labels, predictions)
-hkb.check("hkb_4.kb", "./output/hkb_4_train_accuracy.txt")
+
+hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}3", "smoteenn_3.kb")
+smoteenn_predictions = hkb.predict(test_data, "smoteenn_3.kb", './output/predictions_smoteenn_3.txt')
+print("HKB with SMOTEENN results (3 clusters):")
+metrics.score(test_labels, smoteenn_predictions)
+
+hkb.fit(train_data_smote_tomek, train_labels_smote_tomek, "2}3", "smotetomek_3.kb")
+smotetomek_predictions = hkb.predict(test_data, "smotetomek_3.kb", './output/predictions_smotetomek_3.txt')
+print("HKB with SMOTETOMEK results (3 clusters):")
+metrics.score(test_labels, smotetomek_predictions)
+
+hkb.fit(train_data_ros_tomek, train_labels_ros_tomek, "2}3", "rostomek_3.kb")
+rostomek_predictions = hkb.predict(test_data, "rostomek_3.kb", './output/predictions_rostomek_3.txt')
+print("HKB with ROSTOMEK results (3 clusters):")
+metrics.score(test_labels, rostomek_predictions)
+
+# hkb.fit(train_data, train_labels, "2}2", "hkb_2.kb")
+# predictions = hkb.predict(test_data, "hkb_2.kb", './output/predictions_2.txt')
+# print("HKB results (2 clusters):")
+# metrics.score(test_labels, predictions)
+# hkb.check("hkb_2.kb", "./output/hkb_2_train_accuracy.txt")
+# hkb.fit(train_data, train_labels, "2}4", "hkb_4.kb")
+# predictions = hkb.predict(test_data, "hkb_4.kb", './output/predictions_4.txt')
+# print("HKB results (4 clusters):")
+# metrics.score(test_labels, predictions)
+# hkb.check("hkb_4.kb", "./output/hkb_4_train_accuracy.txt")
 
 # explainer_hkb = lime_tabular.LimeTabularExplainer(
 #     train_data_lime,
@@ -238,85 +254,84 @@ hkb.check("hkb_4.kb", "./output/hkb_4_train_accuracy.txt")
 ################################################
 
 base_dt = DecisionTreeClassifier(random_state=42)
-base_dt_weighted = DecisionTreeClassifier(random_state=42, class_weight='balanced')
-dt_pipeline_weighted = make_pipeline(clone(dt_enc), clone(base_dt_weighted))
-dt_pipeline_weighted_impute = make_pipeline(clone(imputer), clone(dt_enc), clone(base_dt_weighted))
-dt_pipeline_without_sampling = make_pipeline(clone(dt_enc), clone(base_dt))
-dt_pipeline = make_pipeline(clone(smote_os), clone(dt_enc), clone(base_dt))
-smote_enn_pipeline_dt = make_pipeline(clone(smote_enn), clone(dt_enc), clone(base_dt))
-smote_tomek_pipeline_dt = make_pipeline(clone(smote_tomek), clone(dt_enc), clone(base_dt))
-smote_tomek_pipeline_dt_impute = make_pipeline(clone(imputer), clone(smote_tomek), clone(dt_enc), clone(base_dt))
-ros_tomek_pipeline_dt = make_pipeline(CombinedRosTomek(ros=ros,tomek=tomek), clone(dt_enc), clone(base_dt))
-#
-print("Starting DT Baseline Training...")
-grid_dt3 = dt.fit(dt_pipeline_without_sampling, train_data, train_labels)
-print(f"Training finished, best params: {grid_dt3.best_params_}")
-mean_scores_cv(grid_dt3, grid_dt3.cv_results_, './output/dt_cv_summary_baseline.csv')
-predictions_dt2 = grid_dt3.predict(test_data)
-print("Baseline DT results:")
-metrics.score(test_labels, predictions_dt2)
-dt.plot_dt(grid_dt3, "./output/grid_dt_baseline.png")
+# base_dt_weighted = DecisionTreeClassifier(random_state=42, class_weight='balanced')
+# dt_pipeline_weighted = make_pipeline(clone(dt_enc), clone(base_dt_weighted))
+# dt_pipeline_weighted_impute = make_pipeline(clone(imputer), clone(dt_enc), clone(base_dt_weighted))
+# dt_pipeline_without_sampling = make_pipeline(clone(dt_enc), clone(base_dt))
+smote_pipeline_dt = make_pipeline(clone(smote_os), clone(enc), clone(base_dt))
+smote_enn_pipeline_dt = make_pipeline(clone(smote_os), clone(enc), clone(enn), clone(base_dt))
+smote_tomek_pipeline_dt = make_pipeline(clone(smote_os), clone(enc), clone(tomek), clone(base_dt))
+# smote_tomek_pipeline_dt_impute = make_pipeline(clone(imputer), clone(smote_tomek), clone(dt_enc), clone(base_dt))
+ros_tomek_pipeline_dt = make_pipeline(clone(ros), clone(enc), clone(tomek), clone(base_dt))
+# #
+# print("Starting DT Baseline Training...")
+# grid_dt3 = dt.fit(dt_pipeline_without_sampling, train_data, train_labels)
+# print(f"Training finished, best params: {grid_dt3.best_params_}")
+# mean_scores_cv(grid_dt3, grid_dt3.cv_results_, './output/dt_cv_summary_baseline.csv')
+# predictions_dt2 = grid_dt3.predict(test_data)
+# print("Baseline DT results:")
+# metrics.score(test_labels, predictions_dt2)
+# dt.plot_dt(grid_dt3, "./output/grid_dt_baseline.png")
+
+print("Starting DT Training with SMOTE...")
+grid_dt_smote = dt.fit(smote_pipeline_dt, train_data, train_labels)
+print(f"Training finished, best params: {grid_dt_smote.best_params_}")
+mean_scores_cv(grid_dt_smote, grid_dt_smote.cv_results_, './output/dt_cv_summary_smote.csv')
+predictions_dt = grid_dt_smote.predict(test_data)
+print("SMOTE DT results:")
+metrics.score(test_labels, predictions_dt)
+dt.plot_dt(grid_dt_smote, "./output/grid_dt_smote.png")
 
 print("Starting SMOTEENN DT Training...")
 grid_dt_smote_enn = dt.fit(smote_enn_pipeline_dt, train_data, train_labels)
 print(f"Training finished, best params: {grid_dt_smote_enn.best_params_}")
 mean_scores_cv(grid_dt_smote_enn, grid_dt_smote_enn.cv_results_, './output/dt_cv_summary_smoteenn.csv')
-predictions_mlp = grid_dt_smote_enn.predict(test_data)
+smoteenn_predictions_dt = grid_dt_smote_enn.predict(test_data)
 print("SMOTEENN DT results:")
-metrics.score(test_labels, predictions_mlp)
+metrics.score(test_labels, smoteenn_predictions_dt)
 dt.plot_dt(grid_dt_smote_enn, "./output/grid_dt_smoteenn.png")
-#
+
 print("Starting SMOTETOMEK DT Training...")
 grid_dt_smote_tomek = dt.fit(smote_tomek_pipeline_dt, train_data, train_labels)
 print(f"Training finished, best params: {grid_dt_smote_tomek.best_params_}")
 mean_scores_cv(grid_dt_smote_tomek, grid_dt_smote_tomek.cv_results_, './output/dt_cv_summary_smotetomek.csv')
-predictions_mlp = grid_dt_smote_tomek.predict(test_data)
+smotetomek_predictions_dt = grid_dt_smote_tomek.predict(test_data)
 print("SMOTETOMEK DT results:")
-metrics.score(test_labels, predictions_mlp)
+metrics.score(test_labels, smotetomek_predictions_dt)
 dt.plot_dt(grid_dt_smote_tomek, "./output/grid_dt_smote_tomek.png")
-#
-print("Starting SMOTETOMEK DT Training with imputation...")
-grid_dt_smote_tomek_impute = dt.fit(smote_tomek_pipeline_dt_impute, train_data_nanned, train_labels)
-print(f"Training finished, best params: {grid_dt_smote_tomek_impute.best_params_}")
-mean_scores_cv(grid_dt_smote_tomek_impute, grid_dt_smote_tomek_impute.cv_results_, './output/dt_cv_summary_smotetomek_impute.csv')
-predictions_mlp = grid_dt_smote_tomek_impute.predict(test_data_nanned)
-print("SMOTETOMEK DT results:")
-metrics.score(test_labels, predictions_mlp)
-dt.plot_dt(grid_dt_smote_tomek_impute, "./output/grid_dt_smote_tomek_impute.png")
+
+# print("Starting SMOTETOMEK DT Training with imputation...")
+# grid_dt_smote_tomek_impute = dt.fit(smote_tomek_pipeline_dt_impute, train_data_nanned, train_labels)
+# print(f"Training finished, best params: {grid_dt_smote_tomek_impute.best_params_}")
+# mean_scores_cv(grid_dt_smote_tomek_impute, grid_dt_smote_tomek_impute.cv_results_, './output/dt_cv_summary_smotetomek_impute.csv')
+# predictions_mlp = grid_dt_smote_tomek_impute.predict(test_data_nanned)
+# print("SMOTETOMEK DT results:")
+# metrics.score(test_labels, predictions_mlp)
+# dt.plot_dt(grid_dt_smote_tomek_impute, "./output/grid_dt_smote_tomek_impute.png")
 
 print("Starting ROSTOMEK DT Training...")
 grid_dt_ros_tomek = dt.fit(ros_tomek_pipeline_dt, train_data, train_labels)
 print(f"Training finished, best params: {grid_dt_ros_tomek.best_params_}")
 mean_scores_cv(grid_dt_ros_tomek, grid_dt_ros_tomek.cv_results_, './output/dt_cv_summary_rostomek.csv')
-predictions_mlp = grid_dt_ros_tomek.predict(test_data)
+rostomek_predictions_dt = grid_dt_ros_tomek.predict(test_data)
 print("ROSTOMEK DT results:")
-metrics.score(test_labels, predictions_mlp)
+metrics.score(test_labels, rostomek_predictions_dt)
 dt.plot_dt(grid_dt_ros_tomek, "./output/grid_dt_ros_tomek.png")
-#
-#
-# print("Starting DT Training with SMOTE...")
-# grid_dt = dt.fit(dt_pipeline, train_data, train_labels)
-# print(f"Training finished, best params: {grid_dt.best_params_}")
-# mean_scores_cv(grid_dt, grid_dt.cv_results_, './output/dt_cv_summary_oversampling.csv')
-# predictions_dt = grid_dt.predict(test_data)
-# print("DT results with Oversampling:")
-# metrics.score(test_labels, predictions_dt)
-# dt.plot_dt(grid_dt, "./output/grid_dt_smote.png")
 
-print("Starting DT Training with weighted classes...")
-grid_dt_weighted = dt.fit(dt_pipeline_weighted, train_data, train_labels)
-print(f"Training finished, best params: {grid_dt_weighted.best_params_}")
-mean_scores_cv(grid_dt_weighted, grid_dt_weighted.cv_results_, './output/dt_cv_summary_weighted.csv')
-predictions_dt2 = grid_dt_weighted.predict(test_data)
-print("DT results with weighted classes:")
-metrics.score(test_labels, predictions_dt2)
-dt.plot_dt(grid_dt_weighted, "./output/grid_dt_weighted.png")
-
-print("Starting DT Training with weighted classes and imputation...")
-grid_dt2 = dt.fit(dt_pipeline_weighted_impute, train_data_nanned, train_labels)
-print(f"Training finished, best params: {grid_dt2.best_params_}")
-mean_scores_cv(grid_dt2, grid_dt2.cv_results_, './output/dt_cv_summary_weighted_impute.csv')
-predictions_dt2 = grid_dt2.predict(test_data_nanned)
-print("DT results with weighted classes:")
-metrics.score(test_labels, predictions_dt2)
-dt.plot_dt(grid_dt2, "./output/grid_dt_weighted_impute.png")
+# print("Starting DT Training with weighted classes...")
+# grid_dt_weighted = dt.fit(dt_pipeline_weighted, train_data, train_labels)
+# print(f"Training finished, best params: {grid_dt_weighted.best_params_}")
+# mean_scores_cv(grid_dt_weighted, grid_dt_weighted.cv_results_, './output/dt_cv_summary_weighted.csv')
+# predictions_dt2 = grid_dt_weighted.predict(test_data)
+# print("DT results with weighted classes:")
+# metrics.score(test_labels, predictions_dt2)
+# dt.plot_dt(grid_dt_weighted, "./output/grid_dt_weighted.png")
+#
+# print("Starting DT Training with weighted classes and imputation...")
+# grid_dt2 = dt.fit(dt_pipeline_weighted_impute, train_data_nanned, train_labels)
+# print(f"Training finished, best params: {grid_dt2.best_params_}")
+# mean_scores_cv(grid_dt2, grid_dt2.cv_results_, './output/dt_cv_summary_weighted_impute.csv')
+# predictions_dt2 = grid_dt2.predict(test_data_nanned)
+# print("DT results with weighted classes:")
+# metrics.score(test_labels, predictions_dt2)
+# dt.plot_dt(grid_dt2, "./output/grid_dt_weighted_impute.png")

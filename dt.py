@@ -33,7 +33,7 @@ def plot_dt(grid_dt, out_file):
         rounded=True
     )
     plt.savefig(out_file, dpi=300, bbox_inches="tight")  # Save as PNG
-    plt.show()
+    # plt.show()
 
 
 def plot_dt_without_grid(dt, out_file):

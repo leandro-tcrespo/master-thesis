@@ -108,6 +108,7 @@ def get_keras_model():
         optimizer=Adam,
         num_layers=2,
         l2=0.0,
+        random_state=42,
         # fit__callbacks=[PrintModelDetails(),],
         loss='sparse_categorical_crossentropy'
     )

@@ -24,7 +24,7 @@ def preprocess_data(csv_path):
                                         ("AgeScaler", MinMaxScaler(), ['age'])],
                             sparse_threshold=0, verbose_feature_names_out=False)
 
-    smote_os = SMOTENC(random_state=42, k_neighbors=1, categorical_features=categorical_indices)
+    smote_os = SMOTENC(random_state=42, categorical_features=categorical_indices)
     tomek = TomekLinks(sampling_strategy='all', n_jobs=-1)
     enn = EditedNearestNeighbours(sampling_strategy='all', n_jobs=-1)
     ros = RandomOverSampler(random_state=42)

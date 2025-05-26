@@ -68,31 +68,51 @@ train_data_lime = train_data.copy()
 train_data_lime = train_data_lime.to_numpy()
 
 
-def count_labels(enc, train_d, train_l, os=None, us=None):
-    train_l_res = train_l
+def resample_data(enc, train_d, train_l, os=None, us=None):
+    train_d_res = train_d.copy()
+    train_l_res = train_l.copy()
     if os is not None:
         os = clone(os)
         train_d_res, train_l_res = os.fit_resample(train_d, train_l)
     if us is not None:
+        cat_names = [name for name in train_d if name != 'age']
+        cont_name = ['age']
         enc = clone(enc)
         us = clone(us)
-        train_d_enc = enc.fit_transform(train_d_res, train_l_res)
-        train_d_res, train_l_res = us.fit_resample(train_d_enc, train_l_res)
-    train_l_res = pd.DataFrame(train_l_res, columns=["diag_multi"])
-    resampled_counts = train_l_res["diag_multi"].value_counts()
+        train_d_ohe = enc.fit_transform(train_d_res, train_l_res)
+        train_d_res, train_l_res = us.fit_resample(train_d_ohe, train_l_res)
+        categorical_part = train_d_res[:, :-1]
+        continuous_part = train_d_res[:, -1:]
+        train_d_cont = pd.DataFrame((enc.named_transformers_["AgeScaler"].inverse_transform(continuous_part)), columns=cont_name)
+        train_d_cont = train_d_cont.astype(int)
+        train_d_res = pd.DataFrame((enc.named_transformers_["OneHot"].inverse_transform(categorical_part)), columns=cat_names)
+        train_d_res.insert(1, "age", train_d_cont)
+    return train_d_res, train_l_res
+
+
+def count_labels(labels):
+    labels_copy = labels.copy()
+    labels_df = pd.DataFrame(labels_copy, columns=["diag_multi"])
+    resampled_counts = labels_df["diag_multi"].value_counts()
     print("Resampled label counts:")
     print(resampled_counts)
 
+
+train_data_smote, train_labels_smote = resample_data(enc, train_data, train_labels, smote_os)
+train_data_smote_enn, train_labels_smote_enn = resample_data(enc, train_data, train_labels, smote_os, enn)
+train_data_smote_tomek, train_labels_smote_tomek = resample_data(enc, train_data, train_labels, smote_os, tomek)
+train_data_ros_tomek, train_labels_ros_tomek = resample_data(enc, train_data, train_labels, ros, tomek)
+
 print("\nNo Resampling:")
-count_labels(enc, train_data, train_labels)
+count_labels(train_labels)
 print("\nSMOTE:")
-count_labels(enc, train_data, train_labels, smote_os)
+count_labels(train_labels_smote)
 print("\nSMOTEENN:")
-count_labels(enc, train_data, train_labels, smote_os, enn)
+count_labels(train_labels_smote_enn)
 print("\nSMOTETOMEK:")
-count_labels(enc, train_data, train_labels, smote_os, tomek)
+count_labels(train_labels_smote_tomek)
 print("\nROS+TOMEK:")
-count_labels(enc, train_data, train_labels, ros, tomek)
+count_labels(train_labels_ros_tomek)
 
 ################################################
 # MLP testing
@@ -191,37 +211,22 @@ metrics.score(test_labels, ros_tomek_mlp)
 # # metrics.score(test_labels, predictions)
 
 
-def resample_data(X, y, os, us=None):
-    os = clone(os)
-    X_res, y_res = os.fit_resample(X, y)
-    if us is not None:
-        us = clone(us)
-        X_res, y_res = us.fit_resample(X_res, y_res)
-    return X_res, y_res
-
-
-train_data_smote, train_labels_smote = resample_data(train_data, train_labels, smote_os)
-train_data_smote_enn, train_labels_smote_enn = resample_data(train_data, train_labels, smote_os, enn)
-train_data_smote_tomek, train_labels_smote_tomek = resample_data(train_data, train_labels, smote_os, tomek)
-train_data_ros_tomek, train_labels_ros_tomek = resample_data(train_data, train_labels, ros, tomek)
-
-
-hkb.fit(train_data_smote, train_labels_smote, "2}3", "smote_3.kb")
+hkb.fit(train_data_smote, train_labels_smote, "2}Alter_jung,Alter_mittel,Alter_alt", "smote_3.kb")
 predictions = hkb.predict(test_data, "smote_3.kb", './output/predictions_smote_3.txt')
 print("HKB with SMOTE results (3 clusters):")
 metrics.score(test_labels, predictions)
 
-hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}3", "smoteenn_3.kb")
+hkb.fit(train_data_smote_enn, train_labels_smote_enn, "2}Alter_jung,Alter_mittel,Alter_alt", "smoteenn_3.kb")
 smoteenn_predictions = hkb.predict(test_data, "smoteenn_3.kb", './output/predictions_smoteenn_3.txt')
 print("HKB with SMOTEENN results (3 clusters):")
 metrics.score(test_labels, smoteenn_predictions)
 
-hkb.fit(train_data_smote_tomek, train_labels_smote_tomek, "2}3", "smotetomek_3.kb")
+hkb.fit(train_data_smote_tomek, train_labels_smote_tomek, "2}Alter_jung,Alter_mittel,Alter_alt", "smotetomek_3.kb")
 smotetomek_predictions = hkb.predict(test_data, "smotetomek_3.kb", './output/predictions_smotetomek_3.txt')
 print("HKB with SMOTETOMEK results (3 clusters):")
 metrics.score(test_labels, smotetomek_predictions)
 
-hkb.fit(train_data_ros_tomek, train_labels_ros_tomek, "2}3", "rostomek_3.kb")
+hkb.fit(train_data_ros_tomek, train_labels_ros_tomek, "2}Alter_jung,Alter_mittel,Alter_alt", "rostomek_3.kb")
 rostomek_predictions = hkb.predict(test_data, "rostomek_3.kb", './output/predictions_rostomek_3.txt')
 print("HKB with ROSTOMEK results (3 clusters):")
 metrics.score(test_labels, rostomek_predictions)

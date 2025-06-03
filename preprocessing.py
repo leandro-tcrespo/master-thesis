@@ -26,7 +26,7 @@ def preprocess_data(csv_path):
 
     smote_os = SMOTENC(random_state=42, categorical_features=categorical_indices)
     tomek = TomekLinks(sampling_strategy='all', n_jobs=-1)
-    enn = EditedNearestNeighbours(sampling_strategy='all', n_neighbors=2, n_jobs=-1)
+    enn = EditedNearestNeighbours(sampling_strategy='all', n_jobs=-1)
     ros = RandomOverSampler(random_state=42)
 
     return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote_os, seed, enn

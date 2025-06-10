@@ -7,7 +7,6 @@ param_grid = {
     'max_depth': [3, 5, 7, 10, 15, None],
     'min_samples_split': [2, 5, 10, 20, 30],
     'min_samples_leaf': [1, 2, 4, 8, 16],
-    'max_features': ['sqrt', None],
     'min_impurity_decrease': [0.0, 0.01],
     'max_leaf_nodes': [10, 20, 50, 100, 200, None]
 }

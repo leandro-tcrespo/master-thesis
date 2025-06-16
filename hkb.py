@@ -61,7 +61,7 @@ def check_state(item):
     return True
 
 
-def fit(train_data, train_labels, cluster_size, kb, preselect_value=19):
+def fit(train_data, train_labels, cluster_size, kb, train_in="hkb_train_data.txt", preselect_value=19):
     while True:
         try:
             print(f"Fitting HKB with {preselect_value} features...")
@@ -69,10 +69,10 @@ def fit(train_data, train_labels, cluster_size, kb, preselect_value=19):
             convert_cat_features(train_data_copy)
             train_labels_copy = train_labels.copy()
             diag_multi_col = train_labels_copy.pop("diag_multi")
-            train_data_copy.insert(19, "diag_multi", diag_multi_col)
-            train_data_copy.to_csv("hkb_train_data.txt", sep=' ', index=False, header=False)
+            train_data_copy.insert(preselect_value, "diag_multi", diag_multi_col)
+            train_data_copy.to_csv(train_in, sep=' ', index=False, header=False)
             command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
-                       "2", "preselect", str(preselect_value), "avoid", "_missing", "hkb_train_data.txt", kb]
+                       "2", "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
             # clear knowledge base so failed fit is not covered up by previous successful fit this is
             # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
             with open(kb, 'w') as file:
@@ -140,7 +140,7 @@ def intekrator_infer(item, pred_out, kb):
         raise ValueError(f"Inference failed for state {item}. Check './output/infer_output.txt' for details.")
 
 
-def predict(data, kb, pred_out='predictions.txt'):
+def predict(data, kb, train_in="hkb_test_data.txt", pred_out='predictions.txt'):
     print("Starting inference from HKB.")
     with open(pred_out, 'w') as file:
         file.write('')
@@ -148,7 +148,7 @@ def predict(data, kb, pred_out='predictions.txt'):
     predictions = np.array([])
     convert_cat_features(data_copy)
     formatted_data = convert_num_features(data_copy)
-    data_to_txt(formatted_data)
+    data_to_txt(formatted_data, train_in)
     for item in formatted_data:
         if check_state(item):
             line = intekrator_infer(item, pred_out, kb)

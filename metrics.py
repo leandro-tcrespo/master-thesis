@@ -5,7 +5,7 @@ from scipy.stats import pearsonr
 import pandas as pd
 
 
-def score(y_true, y_pred):
+def score(y_true, y_pred, modelname, filename):
 
     label_order = ['Kein','PsA','RA','SpA']
 
@@ -15,17 +15,18 @@ def score(y_true, y_pred):
     f1 = f1_score(y_true, y_pred, labels=label_order, average=None, zero_division=0.0)
     spec = specificity_score(y_true, y_pred, labels=label_order, average=None)
 
-    print("Class     Precision   Recall      F1-Score    Specificity")
-    print("---------------------------------------------------------")
-    print(f"Kein      {precision[0]:.2f}        {recall[0]:.2f}        {f1[0]:.2f}        {spec[0]:.2f}")
-    print(f"PsA       {precision[1]:.2f}        {recall[1]:.2f}        {f1[1]:.2f}        {spec[1]:.2f}")
-    print(f"RA        {precision[2]:.2f}        {recall[2]:.2f}        {f1[2]:.2f}        {spec[2]:.2f}")
-    print(f"SpA       {precision[3]:.2f}        {recall[3]:.2f}        {f1[3]:.2f}        {spec[3]:.2f}")
-    print("---------------------------------------------------------")
-    print(f"Avg       {precision.mean():.2f}        {recall.mean():.2f}        {f1.mean():.2f}        {spec.mean():.2f}")
-    print("---------------------------------------------------------")
-    print(f"Accuracy  {accuracy}")
-    print("---------------------------------------------------------")
+    print(modelname, file=filename)
+    print("Class     Precision   Recall      F1-Score    Specificity", file=filename)
+    print("---------------------------------------------------------", file=filename)
+    print(f"Kein      {precision[0]:.2f}        {recall[0]:.2f}        {f1[0]:.2f}        {spec[0]:.2f}", file=filename)
+    print(f"PsA       {precision[1]:.2f}        {recall[1]:.2f}        {f1[1]:.2f}        {spec[1]:.2f}", file=filename)
+    print(f"RA        {precision[2]:.2f}        {recall[2]:.2f}        {f1[2]:.2f}        {spec[2]:.2f}", file=filename)
+    print(f"SpA       {precision[3]:.2f}        {recall[3]:.2f}        {f1[3]:.2f}        {spec[3]:.2f}", file=filename)
+    print("---------------------------------------------------------", file=filename)
+    print(f"Avg       {precision.mean():.2f}        {recall.mean():.2f}        {f1.mean():.2f}        {spec.mean():.2f}", file=filename)
+    print("---------------------------------------------------------", file=filename)
+    print(f"Accuracy  {accuracy}", file=filename)
+    print("---------------------------------------------------------", file=filename)
 
 
 # implementation of complexity measure as defined in "Evaluating and Aggregating Feature-based Model Explanations" -

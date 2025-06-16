@@ -17,17 +17,17 @@ def preprocess_data(csv_path):
     categorical_features = [name for name in features if name != 'age']
     categorical_indices = [X.columns.get_loc(col) for col in categorical_features]
 
-    datasets = train_test_split(X, y, test_size=0.25, random_state=42)
+    datasets = train_test_split(X, y, test_size=0.25, random_state=seed)
     train_data, test_data, train_labels, test_labels = datasets
 
     enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features),
                                         ("AgeScaler", MinMaxScaler(), ['age'])],
                             sparse_threshold=0, verbose_feature_names_out=False)
 
-    smote_os = SMOTENC(random_state=42, categorical_features=categorical_indices)
+    smote_os = SMOTENC(random_state=seed, categorical_features=categorical_indices)
     tomek = TomekLinks(sampling_strategy='all', n_jobs=-1)
     enn = EditedNearestNeighbours(sampling_strategy='all', n_jobs=-1)
-    ros = RandomOverSampler(random_state=42)
+    ros = RandomOverSampler(random_state=seed)
 
     return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote_os, seed, enn
 

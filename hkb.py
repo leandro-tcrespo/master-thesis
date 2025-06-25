@@ -61,7 +61,7 @@ def check_state(item):
     return True
 
 
-def fit(train_data, train_labels, cluster_size, kb, train_in="hkb_train_data.txt", preselect_value=19):
+def fit(train_data, train_labels, name, cluster_size, kb, train_in="hkb_train_data.txt", preselect_value=19):
     while True:
         try:
             print(f"Fitting HKB with {preselect_value} features...")
@@ -78,16 +78,16 @@ def fit(train_data, train_labels, cluster_size, kb, train_in="hkb_train_data.txt
             with open(kb, 'w') as file:
                 file.write('')
             result = subprocess.run(command, capture_output=True, text=True, check=True)
-            with open('./output/fit_output.txt', 'w') as o:
+            with open(f'./output/{name}/fit_output.txt', 'w') as o:
                 o.write(result.stdout)
                 o.write(result.stderr)
             if os.path.getsize(kb) == 0:
                 raise ValueError("The knowledge base is empty, HKB fitting probably failed."
-                                 "Check './output/fit_output.txt' for details.")
+                                 f"Check './output/{name}/fit_output.txt' for details.")
             print(f"HKB fitted successfully. {preselect_value} features were used for training.")
             break
         except subprocess.CalledProcessError as e:
-            with open('./output/fit_output.txt', 'w') as o:
+            with open(f'./output/{name}/fit_output.txt', 'w') as o:
                 o.write(e.stdout)
                 o.write(e.stderr)
             error_message = e.stdout + e.stderr
@@ -98,10 +98,10 @@ def fit(train_data, train_labels, cluster_size, kb, train_in="hkb_train_data.txt
                 else:
                     print("Can't reduce amount features anymore. Giving up.")
                     raise ValueError("HKB fitting failed due to memory issues. "
-                                     "Check './output/fit_output.txt' for details.")
+                                     f"Check './output/{name}/fit_output.txt' for details.")
 
             else:
-                raise ValueError("HKB fitting failed. Check './output/fit_output.txt' for details.")
+                raise ValueError(f"HKB fitting failed. Check './output/{name}/fit_output.txt' for details.")
 
 
 def check(kb, outfile):
@@ -109,7 +109,7 @@ def check(kb, outfile):
     subprocess.run(command, capture_output=True, text=True, check=True)
 
 
-def intekrator_infer(item, pred_out, kb):
+def intekrator_infer(name, item, pred_out, kb):
     try:
         command = (["java", "-jar", "InteKRator.jar", "-infer", "why"]
                    + shlex.split(item)
@@ -119,7 +119,7 @@ def intekrator_infer(item, pred_out, kb):
         with open('inference.txt', 'w') as file:
             file.write('')
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-        with open('./output/infer_output.txt', 'w') as o:
+        with open(f'./output/{name}/infer_output.txt', 'w') as o:
             o.write(result.stdout)
             o.write(result.stderr)
         with open('inference.txt', 'r') as file:
@@ -128,19 +128,19 @@ def intekrator_infer(item, pred_out, kb):
         if line == "":
             raise ValueError(f"No inference possible for state \n{item}.\n"
                              f"Is the knowledge base empty or without top rule? "
-                             f"If not, check './output/infer_output.txt' for details.")
+                             f"If not, check './output/{name}/infer_output.txt' for details.")
         with open(pred_out, 'a') as append_file:
             # append_file.write(item + '\n')
             append_file.write(line + '\n')
         return line
     except subprocess.CalledProcessError as e:
-        with open('./output/infer_output.txt', 'w') as o:
+        with open(f'./output/{name}/infer_output.txt', 'w') as o:
             o.write(e.stdout)
             o.write(e.stderr)
-        raise ValueError(f"Inference failed for state {item}. Check './output/infer_output.txt' for details.")
+        raise ValueError(f"Inference failed for state {item}. Check './output/{name}/infer_output.txt' for details.")
 
 
-def predict(data, kb, train_in="hkb_test_data.txt", pred_out='predictions.txt'):
+def predict(data, name, kb, train_in="hkb_test_data.txt", pred_out='predictions.txt'):
     print("Starting inference from HKB.")
     with open(pred_out, 'w') as file:
         file.write('')
@@ -151,7 +151,7 @@ def predict(data, kb, train_in="hkb_test_data.txt", pred_out='predictions.txt'):
     data_to_txt(formatted_data, train_in)
     for item in formatted_data:
         if check_state(item):
-            line = intekrator_infer(item, pred_out, kb)
+            line = intekrator_infer(name, item, pred_out, kb)
             prediction = line.split('   (')[0]
             predictions = np.append(predictions, prediction)
             with open(pred_out, 'a') as append_file:

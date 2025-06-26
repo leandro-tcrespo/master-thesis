@@ -39,7 +39,7 @@ def save_confusion_matrix(y_true, y_pred, model_name, output_path):
     disp.plot()
     plt.title(f'{model_name} Confusion Matrix')
     plt.savefig(f'{output_path}/{model_name}_confusion_matrix.png')
-    plt.close()
+    plt.close('all')
 
 
 def log_results(train_data, test_data, seed, id, enc, ros, tomek,name):

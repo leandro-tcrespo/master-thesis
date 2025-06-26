@@ -107,20 +107,27 @@ def fit_and_test_dt(train_data, test_data, train_labels, test_labels, enc, ros, 
 
 
 def fit_and_test_hkb(train_data, test_data, train_labels, test_labels, id):
-    hkb.fit(train_data, train_labels, "2}Alter_jung,Alter_mittel,Alter_alt", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
-    train_preds_hkb = hkb.predict(train_data, f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", f"./output/hkbs/train_preds_hkb_{id}.txt")
-    test_preds_hkb = hkb.predict(test_data, f"hkb_{id}.kb", f"hkb_test_data_{id}.txt", f'./output/hkbs/test_preds_hkb_{id}.txt')
+    if "age" in train_data.columns:
+        age_index = train_data.columns.get_loc('age')
+        hkb.fit(train_data, train_labels, f"{age_index+1}}}Alter_jung,Alter_mittel,Alter_alt", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
+    else:
+        hkb.fit(train_data, train_labels, "", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
+    train_preds_hkb = hkb.predict(train_data, f"hkb_{id}.kb", f"hkb_train_samples_{id}.txt", f"./output/hkbs/train_preds_hkb_{id}.txt")
+    test_preds_hkb = hkb.predict(test_data, f"hkb_{id}.kb", f"hkb_test_samples_{id}.txt", f'./output/hkbs/test_preds_hkb_{id}.txt')
     metrics.score(train_labels, train_preds_hkb, f"HKB_{id} training results:", hkb_f)
     metrics.score(test_labels, test_preds_hkb, f"HKB_{id} results:", hkb_f)
     shutil.copy2(f"hkb_{id}.kb", f"./output/hkbs/hkb_{id}.kb")
-    shutil.copy2(f"hkb_{id}.map", f"./output/hkbs/hkb_{id}.map")
-    shutil.copy2(f"hkb_{id}_discretized.sa", f"./output/hkbs/hkb_{id}_discretized.sa")
+    if "age" in train_data.columns:
+        shutil.copy2(f"hkb_{id}.map", f"./output/hkbs/hkb_{id}.map")
     return test_preds_hkb
 
 
-for i in range(6):
+for i in range(5):
     (train_data, test_data, train_labels, test_labels, enc,
-     ros, tomek, smote_os, seed, enn) = (preprocessing.preprocess_data("./Synthetic_data.csv"))
+     ros, tomek, smote, seed, enn) = (preprocessing.preprocess_data("./Synthetic_data.csv"))
+    # edit seeds for each iteration here if needed
+    seeds = [seed]*5
+    seed = seeds[i]
     print("Starting MLP Training...")
     test_preds_mlp = fit_and_test_mlp(train_data, test_data, train_labels, test_labels, enc, ros, tomek, seed, i)
     print("Starting DT Training...")

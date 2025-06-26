@@ -20,14 +20,18 @@ def preprocess_data(csv_path):
     datasets = train_test_split(X, y, test_size=0.25, random_state=seed)
     train_data, test_data, train_labels, test_labels = datasets
 
-    enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features),
-                                        ("AgeScaler", MinMaxScaler(), ['age'])],
-                            sparse_threshold=0, verbose_feature_names_out=False)
+    if 'age' not in features:
+        enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features)],
+                                sparse_threshold=0, verbose_feature_names_out=False)
 
-    smote_os = SMOTENC(random_state=seed, categorical_features=categorical_indices)
+    else:
+        enc = ColumnTransformer([("OneHot", OneHotEncoder(handle_unknown='ignore', ), categorical_features),
+                                            ("AgeScaler", MinMaxScaler(), ['age'])],
+                                sparse_threshold=0, verbose_feature_names_out=False)
+
+    smote = SMOTENC(random_state=seed, categorical_features=categorical_indices)
     tomek = TomekLinks(sampling_strategy='all', n_jobs=-1)
     enn = EditedNearestNeighbours(sampling_strategy='all', n_jobs=-1)
     ros = RandomOverSampler(random_state=seed)
 
-    return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote_os, seed, enn
-
+    return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote, seed, enn

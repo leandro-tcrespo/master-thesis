@@ -4,22 +4,28 @@ from sklearn import clone
 def resample_data(enc, train_d, train_l, os=None, us=None):
     train_d_res = train_d.copy()
     train_l_res = train_l.copy()
+    columns = train_d_res.columns
     if os is not None:
         os = clone(os)
         train_d_res, train_l_res = os.fit_resample(train_d, train_l)
     if us is not None:
-        cat_names = [name for name in train_d if name != 'age']
-        cont_name = ['age']
         enc = clone(enc)
         us = clone(us)
-        train_d_ohe = enc.fit_transform(train_d_res, train_l_res)
-        train_d_res, train_l_res = us.fit_resample(train_d_ohe, train_l_res)
-        categorical_part = train_d_res[:, :-1]
-        continuous_part = train_d_res[:, -1:]
-        train_d_cont = pd.DataFrame((enc.named_transformers_["AgeScaler"].inverse_transform(continuous_part)), columns=cont_name)
-        train_d_cont = train_d_cont.astype(int)
-        train_d_res = pd.DataFrame((enc.named_transformers_["OneHot"].inverse_transform(categorical_part)), columns=cat_names)
-        train_d_res.insert(1, "age", train_d_cont)
+        if 'age' in columns:
+            cat_names = [name for name in train_d if name != 'age']
+            age_index = train_d_res.columns.get_loc("age")
+            train_d_ohe = enc.fit_transform(train_d_res, train_l_res)
+            train_d_res, train_l_res = us.fit_resample(train_d_ohe, train_l_res)
+            cat_part = train_d_res[:, :-1]
+            cont_part = train_d_res[:, -1:]
+            train_d_cont = pd.DataFrame((enc.named_transformers_["AgeScaler"].inverse_transform(cont_part)), columns=['age'])
+            train_d_cont = train_d_cont.astype(int)
+            train_d_res = pd.DataFrame((enc.named_transformers_["OneHot"].inverse_transform(cat_part)), columns=cat_names)
+            train_d_res.insert(age_index, "age", train_d_cont)
+        else:
+            train_d_ohe = enc.fit_transform(train_d_res, train_l_res)
+            train_d_res, train_l_res = us.fit_resample(train_d_ohe, train_l_res)
+            train_d_res = pd.DataFrame((enc.named_transformers_["OneHot"].inverse_transform(train_d_res)), columns=columns)
     return train_d_res, train_l_res
 
 

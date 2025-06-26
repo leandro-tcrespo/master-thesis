@@ -31,18 +31,21 @@ def convert_cat_features(df):
 
 
 # this is only relevant for properly using InteKRators infer module, not relevant for fitting model
+# TODO: name might be misleading, this is more than converting num features, its converting samples that are to be predicted into a list
 def convert_num_features(data):
     formatted_data = []
     for index, row in data.iterrows():
         row_list = row.astype(str)
-        row_list.iloc[1] = 'S2:' + row_list.iloc[1]
+        if "age" in data.columns:
+            age_index = data.columns.get_loc('age')
+            row_list.iloc[age_index] = f"S{age_index+1}:" + row_list.iloc[age_index]
         row = ' '.join(row_list)
         formatted_data.append(row)
     return formatted_data
 
 
-# converts list to a text file in the right data format for InteKRator
-def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
+# converts list to a text file in the right data format for InteKRator, only for debugging
+def data_to_txt(formatted_data, outfile="hkb_test_samples.txt"):
     with open(outfile, 'w') as file:
         for line in formatted_data:
             file.write(line + '\n')
@@ -51,12 +54,16 @@ def data_to_txt(formatted_data, outfile="hkb_test_data.txt"):
 # this checks if samples that are passed to InteKRator are in the right format, technically this makes duplicate
 # features possible (male 50 a_1 a_1 b_2 ...) but usually this should not happen, this method is mostly for making sure
 # that the data passed is not totally wrong
-def check_state(item):
+def check_state(item, age_index):
     parts = item.split()
-    if parts[0] not in ["female", "male"] or not parts[1].startswith("S2:"):
-        return False
-    for part in parts[2:]:
-        if not re.match(r"^[a-q]_(1|2|missing)$", part):
+    for part in parts:
+        if part in {"female", "male"}:
+            continue
+        elif age_index != -1 and re.match(rf'^S{age_index+1}+:\d+(\.\d+)?$', part):
+            continue
+        elif re.match(r'^[a-q]_(1|2|missing)$', part):
+            continue
+        else:
             return False
     return True
 
@@ -71,8 +78,12 @@ def fit(train_data, train_labels, cluster_size, kb, train_in="hkb_train_data.txt
             diag_multi_col = train_labels_copy.pop("diag_multi")
             train_data_copy.insert(preselect_value, "diag_multi", diag_multi_col)
             train_data_copy.to_csv(train_in, sep=' ', index=False, header=False)
-            command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
-                       "2", "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
+            if "age" in train_data_copy.columns:
+                age_index = train_data_copy.columns.get_loc('age')
+                command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "discretize", cluster_size, "info",
+                           str(age_index+1), "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
+            else:
+                command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
             # clear knowledge base so failed fit is not covered up by previous successful fit this is
             # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
             with open(kb, 'w') as file:
@@ -140,17 +151,20 @@ def intekrator_infer(item, pred_out, kb):
         raise ValueError(f"Inference failed for state {item}. Check './output/infer_output.txt' for details.")
 
 
-def predict(data, kb, train_in="hkb_test_data.txt", pred_out='predictions.txt'):
+def predict(data, kb, data_out="hkb_test_samples.txt", pred_out='predictions.txt'):
     print("Starting inference from HKB.")
     with open(pred_out, 'w') as file:
         file.write('')
     data_copy = data.copy()
     predictions = np.array([])
     convert_cat_features(data_copy)
+    age_index = -1
+    if "age" in data.columns:
+        age_index = data.columns.get_loc("age")
     formatted_data = convert_num_features(data_copy)
-    data_to_txt(formatted_data, train_in)
+    data_to_txt(formatted_data, data_out)
     for item in formatted_data:
-        if check_state(item):
+        if check_state(item, age_index):
             line = intekrator_infer(item, pred_out, kb)
             prediction = line.split('   (')[0]
             predictions = np.append(predictions, prediction)

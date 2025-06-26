@@ -7,11 +7,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 
 
-def preprocess_data(csv_path):
-    # for reproducibility of the train test split
-    seed = np.random.randint(0, 2**31-1,)
+def preprocess_data(csv_path, cols_to_load, seed):
     data = pd.read_csv(csv_path, header=0)
-    X = data[['sex', 'age', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q']]
+    X = data[cols_to_load]
     y = data[['diag_multi']]
     features = X.columns
     categorical_features = [name for name in features if name != 'age']
@@ -34,4 +32,4 @@ def preprocess_data(csv_path):
     enn = EditedNearestNeighbours(sampling_strategy='all', n_jobs=-1)
     ros = RandomOverSampler(random_state=seed)
 
-    return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote, seed, enn
+    return train_data, test_data, train_labels, test_labels, enc, ros, tomek, smote, enn

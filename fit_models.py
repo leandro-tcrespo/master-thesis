@@ -123,6 +123,9 @@ def fit_and_test_hkb(train_data, test_data, train_labels, test_labels, id, name,
     return test_preds_hkb
 
 
+# for reproducibility of the train test split
+seeds = np.random.randint(0, 2 ** 31 - 1, size=6)
+
 for name, cols_to_load in feature_groups.items():
     make_folders (name)
     
@@ -135,8 +138,9 @@ for name, cols_to_load in feature_groups.items():
     hkb_f = open(f"./output/{name}/hkb_results.txt", "a")
     
     for i in range(6):
+        seed = int(seeds[i])
         (train_data, test_data, train_labels, test_labels, enc,
-         ros, tomek, smote, seed, enn) = (preprocessing.preprocess_data("../data/data.csv", cols_to_load))
+         ros, tomek, smote, enn) = (preprocessing.preprocess_data("../data/data.csv", cols_to_load, seed))
         print("Starting MLP Training...")
         test_preds_mlp = fit_and_test_mlp(train_data, test_data, train_labels, test_labels, enc, ros, tomek, seed, i, name, mlp_f)
         print("Starting DT Training...")

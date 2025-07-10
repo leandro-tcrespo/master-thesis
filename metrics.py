@@ -1,8 +1,12 @@
+import json
+
 import numpy as np
 from imblearn.metrics import specificity_score
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from scipy.stats import pearsonr
 import pandas as pd
+
+import hkb
 
 
 def score(y_true, y_pred, modelname, filename):
@@ -32,57 +36,121 @@ def score(y_true, y_pred, modelname, filename):
 # implementation of complexity measure as defined in "Evaluating and Aggregating Feature-based Model Explanations" -
 # https://arxiv.org/abs/2005.00631
 # implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
-def compute_complexity(fi_values):
-    abs_fi_values = np.abs(fi_values)
-    P_g = abs_fi_values / (np.sum(abs_fi_values) + 1e-10)
+def compute_complexity(attributions):
+    abs_attributions = np.abs(attributions)
+    P_g = abs_attributions / (np.sum(abs_attributions) + 1e-10)
 
     complexity = -np.sum(P_g * np.log(P_g + 1e-10))
 
     return complexity
 
 
-# todo: basic functionality done, will have to look into what baseline is chosen ("all zeros" or one baseline value
-#  per feature, rn just passing array full with 1s that doesn't work for age for example),
-#  also will have to look into how baseline is correctly applied if not all features used in training
-#  are used for explanations (to make explanations easier to read), in this case the non-selected features(by Shap/Lime)
-#  would have to be fixed, so they are not perturbed (only the selected features should be perturbed since these are
-#  deemed the most important features by Lime), it would be better to compute faithfulness_corr with all features
-#  able to be perturbed but in the end its a tradeoff between interpretability and accuracy of FC
-#  more features => more subsets explorable but also less readable explanation
+def avg_complexities(all_attributions):
+    complexities = [compute_complexity(attributions) for attributions in all_attributions]
+    mean_complexity = np.mean(complexities) if complexities else 0
+    return complexities, mean_complexity
+
+
 # implementation of faithfulness correlation as defined in
 # "Evaluating and Aggregating Feature-based Model Explanations" - https://arxiv.org/abs/2005.00631
 # implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
 def faithfulness_corr(
         model,
         input_sample,
-        attributions,
+        attributions,   # attribution array for passed explanation
         feature_names,
+        baseline,
+        label,
+        seed,
         n_repeats=20,
         n_features_subset=5,
-        baseline=None,
-        label=None
+        kb=None,
+        name=None,
+        discretized_data_path=None
 ):
-    original_probs = model.predict_proba(pd.DataFrame([input_sample],columns=feature_names))[0]
+    np.random.seed(seed)
+    # floats, so the mean value for age from the baseline is used when replacing indices for perturbed array
+    input_sample = np.array(input_sample).astype(float)
+    baseline = np.array(baseline)
 
+    input_df = pd.DataFrame([input_sample], columns=feature_names)
+    if model == "hkb":
+        original_probs = hkb.predict_proba(input_df, name, kb, discretized_data_path).flatten()
+    else:
+        original_probs = model.predict_proba(input_df).flatten()
     original_pred = original_probs[label]
 
     prediction_diffs = []
     attribution_sums = []
 
-    for _ in range(n_repeats):
+    for i in range(n_repeats):
         replace_indices = np.random.choice(len(input_sample), n_features_subset, replace=False)
 
         perturbed = input_sample.copy()
         perturbed[replace_indices] = baseline[replace_indices]
 
-        perturbed_probs = model.predict_proba(pd.DataFrame([perturbed],columns=feature_names))[0]
+        perturbed_df = pd.DataFrame([perturbed], columns=feature_names)
+        if model == "hkb":
+            perturbed_probs = hkb.predict_proba(perturbed_df, name, kb, discretized_data_path).flatten()
+        else:
+            perturbed_probs = model.predict_proba(perturbed_df).flatten()
         perturbed_pred = perturbed_probs[label]
 
         delta = original_pred - perturbed_pred
-
         attr_sum = attributions[replace_indices].sum()
 
         prediction_diffs.append(delta)
         attribution_sums.append(attr_sum)
 
-    return pearsonr(prediction_diffs, attribution_sums)[0]
+    prediction_diffs = np.array(prediction_diffs)
+    attribution_sums = np.array(attribution_sums)
+
+    if np.all(prediction_diffs == prediction_diffs[0]) or np.all(attribution_sums == attribution_sums[0]):
+        return np.nan
+    return np.corrcoef(prediction_diffs, attribution_sums)[0, 1]
+
+
+def avg_faithfulness_corr(
+        model,
+        data,
+        all_attributions,
+        feature_names,
+        baseline,
+        labels,
+        seed,
+        kb=None,
+        name=None,
+        discretized_data_path=None
+):
+    data = np.array(data)
+    faithfulness_scores = []
+    for i, sample in enumerate(data):
+        faithfulness_scores.append(faithfulness_corr(model, sample, all_attributions[i], feature_names, baseline, labels[i], seed, kb=kb, name=name, discretized_data_path=discretized_data_path))
+    if np.nan in faithfulness_scores:
+        print("Some faithfulness_scores are nan. Ignoring nan values for mean score.")
+    return faithfulness_scores, np.nanmean(faithfulness_scores),
+
+
+def get_baseline(df):
+    # get first row in case some modes are tied for some features
+    feature_vector = df.mode().iloc[0]
+    if "age" in df.columns:
+        feature_vector["age"] = df["age"].mean()
+    return feature_vector.to_numpy()
+
+
+# Calculate metrics
+def score_explain(model, explain_data, all_attributions, feature_names,
+                  baseline, pred_inds, seed, kb, name, discretized_data_path):
+    cmplx_scores, cmplx_avg = avg_complexities(all_attributions)
+    fthfl_scores, fthfl_avg = avg_faithfulness_corr(model, explain_data, all_attributions, feature_names,
+                                                    baseline, pred_inds, seed, kb, name, discretized_data_path)
+    cmplx_scores_json = json.dumps(cmplx_scores)
+    fthfl_scores_json = json.dumps(fthfl_scores)
+    metric_results = {
+                "cmplx_scores": cmplx_scores_json,
+                "cmplx_avg": cmplx_avg,
+                "fthfl_scores": fthfl_scores_json,
+                "fthfl_avg": fthfl_avg,
+                     }
+    return metric_results

@@ -1,5 +1,11 @@
+import numpy as np
 import pandas as pd
+from imblearn.under_sampling import RandomUnderSampler, ClusterCentroids
 from sklearn import clone
+from sklearn.model_selection import train_test_split
+
+import hkb
+
 
 def resample_data(enc, train_d, train_l, os=None, us=None):
     train_d_res = train_d.copy()
@@ -36,3 +42,22 @@ def count_labels(labels):
     print("Resampled label counts:")
     print(resampled_counts)
     return resampled_counts
+
+
+def subsample_data(data, labels, seed):
+    rus = RandomUnderSampler(sampling_strategy="majority", random_state=seed) # todo: include in thesis that random undersampling is not optimal since samples with "unclear" decision boundaries could be chosen, clustering would be better but would have to be treated with care because of the categorical features
+    data_res, labels_res = rus.fit_resample(data, labels)
+    return data_res, labels_res
+
+
+def get_predicted_labels(model, data, name=None, kb=None, pred_out=None):
+    if model == "hkb":
+        class_names = hkb.CLASS_ORDER
+        preds = hkb.predict(data, name, kb, pred_out=pred_out)
+        predicted_inds = [hkb.CLASS_ORDER.index(pred) for pred in preds]
+    else:
+        class_names = model.steps[-1][1].classes_
+        preds = model.predict_proba(data)
+        predicted_inds = np.argmax(preds, axis=1)
+    predicted_strings = [class_names[i] for i in predicted_inds]
+    return predicted_inds, predicted_strings

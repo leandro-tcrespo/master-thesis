@@ -37,8 +37,9 @@ background_data_res, background_labels_res = utils.subsample_data(train_data, tr
 feature_names = feature_loader.no_lab_features
 
 hkb_results_shap, hkb_results_lime, _, _ = explain_utils.explain_model(
-    "hkb", explain_data, background_data, feature_names, baseline, seed, plot_explanations=True,
-    name=results_path_hkb, kb="hkb_0.kb", discretized_data_path="hkb_0_discretized.sa"
+    "hkb", explain_data, background_data, feature_names, baseline, seed, True, "hkb_0.kb",
+    results_path_hkb, "hkb_0_discretized.sa",
+    "shap_lime_samples.txt", "shap_lime_predictions.txt"
 )
 
 with open(f"./output/{results_path_hkb}/explain_results_hkb_shap.json", "w") as f:
@@ -48,8 +49,9 @@ with open(f"./output/{results_path_hkb}/explain_results_hkb_lime.json", "w") as 
 
 
 hkb_results_shap2, hkb_results_lime2, _, _ = explain_utils.explain_model(
-    "hkb", explain_data, background_data_res, feature_names, baseline, seed, plot_explanations=True,
-    name=results_path_hkb_res, kb="hkb_0.kb", discretized_data_path="hkb_0_discretized.sa"
+    "hkb", explain_data, background_data_res, feature_names, baseline, seed, True, "hkb_0.kb",
+    results_path_hkb_res, "hkb_0_discretized.sa",
+    "shap_lime_samples.txt", "shap_lime_predictions.txt"
 )
 
 with open(f"./output/{results_path_hkb_res}/explain_results_hkb_shap_res.json", "w") as f:

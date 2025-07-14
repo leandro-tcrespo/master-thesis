@@ -22,11 +22,12 @@ def explain_model(
     kb=None,
     name=None, # has to be hkb_explain, dt_explain, mlp_explain
     discretized_data_path=None,
-    data_out=None,
+    formatted_samples_path=None,
     pred_out=None
 ):
     if model == "hkb":
-        predict_proba = PredictProbaWrapper(model, feature_names, name, kb, discretized_data_path, data_out, pred_out)
+        predict_proba = PredictProbaWrapper(model, feature_names, name, kb, discretized_data_path,
+                                            formatted_samples_path, pred_out)
         class_names = hkb.CLASS_ORDER
     else:
         predict_proba = PredictProbaWrapper(model, feature_names)
@@ -50,7 +51,8 @@ def explain_model(
 
     # Get predictions and explanations, predictions are logged
     pred_inds, pred_strings = utils.get_predicted_labels(model, explain_data, name, kb,
-                                                         f"./output/{name}/predictions.txt")
+                                                         f"./explain_data_formatted_samples.txt",
+                                                         f"./output/{name}/explain_data_predictions.txt")
 
     shap_explanations = get_shap_explanations(shap_explainer, explain_data, pred_inds)
     lime_explanations = get_lime_explanations(lime_explainer, explain_data, predict_proba, pred_inds)
@@ -160,20 +162,22 @@ def get_lime_attributions(explanations, pred_inds):
 
 # wraps predict_proba methods for use with shap and lime, model can be either a dt/mlp pipeline or string "hkb"
 class PredictProbaWrapper:
-    def __init__(self, model, feature_names, name=None, kb=None, discretized_data_path=None, data_out=None, pred_out=None):
+    def __init__(self, model, feature_names, name=None, kb=None, discretized_data_path=None,
+                 formatted_samples_path=None, pred_out=None):
         self.model = model
         self.feature_names = feature_names
         self.name = name
         self.kb = kb
         self.discretized_data_path = discretized_data_path
-        self.data_out=data_out
+        self.formatted_samples_path=formatted_samples_path
         self.pred_out=pred_out
 
     def __call__(self, data):
         df = pd.DataFrame(data, columns=self.feature_names)
         if self.model == "hkb":
-            # print("Input samples:", len(df))
-            preds = hkb.predict_proba(df, self.name, self.kb, self.discretized_data_path, self.data_out, self.pred_out)
+            print("Input samples:", len(df))
+            preds = hkb.predict_proba(df, self.name, self.kb, self.discretized_data_path, self.formatted_samples_path,
+                                      self.pred_out)
             return preds
         # print("Input samples:", len(df))
         return self.model.predict_proba(df)

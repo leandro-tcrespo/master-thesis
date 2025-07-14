@@ -113,8 +113,10 @@ def fit_and_test_hkb(train_data, test_data, train_labels, test_labels, id, name,
         hkb.fit(train_data, train_labels, name, f"{age_index+1}}}Alter_jung,Alter_mittel,Alter_alt", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
     else:
         hkb.fit(train_data, train_labels, name, "", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
-    train_preds_hkb = hkb.predict(train_data, name, f"hkb_{id}.kb", f"hkb_train_samples_{id}.txt", f"./output/{name}/hkbs/train_preds_hkb_{id}.txt")
-    test_preds_hkb = hkb.predict(test_data, name, f"hkb_{id}.kb", f"hkb_test_samples_{id}.txt", f'./output/{name}/hkbs/test_preds_hkb_{id}.txt')
+    train_preds_hkb = hkb.predict(train_data, name, f"hkb_{id}.kb", f"hkb_train_samples_{id}.txt",
+                                  f"./output/{name}/hkbs/train_preds_hkb_{id}.txt")
+    test_preds_hkb = hkb.predict(test_data, name, f"hkb_{id}.kb", f"hkb_test_samples_{id}.txt",
+                                 f'./output/{name}/hkbs/test_preds_hkb_{id}.txt')
     metrics.score(train_labels, train_preds_hkb, f"HKB_{id} training results:", hkb_f)
     metrics.score(test_labels, test_preds_hkb, f"HKB_{id} results:", hkb_f)
     shutil.copy2(f"hkb_{id}.kb", f"./output/{name}/hkbs/hkb_{id}.kb")

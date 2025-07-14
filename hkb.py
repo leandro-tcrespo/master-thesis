@@ -1,10 +1,8 @@
 import os
 import re
-import shlex
 import subprocess
 
 import numpy as np
-import pandas
 
 CLASS_ORDER = ['Kein', 'RA', 'SpA', 'PsA']
 
@@ -59,13 +57,17 @@ def convert_cat_features(df):
 # TODO: name might be misleading, this is more than converting num features, its converting samples that are to be predicted into a list
 def convert_num_features(data):
     formatted_data = []
+    age_index = -1
     for index, row in data.iterrows():
         row_list = row.astype(str)
         if "age" in data.columns:
             age_index = data.columns.get_loc('age')
             row_list.iloc[age_index] = f"S{age_index+1}:" + row_list.iloc[age_index]
         row = ' '.join(row_list)
-        formatted_data.append(row)
+        if check_state(row, age_index):
+            formatted_data.append(row)
+        else:
+            raise ValueError(f"Invalid format for state {row}.")
     return formatted_data
 
 
@@ -109,8 +111,8 @@ def fit(train_data, train_labels, name, cluster_size, kb, train_in="hkb_train_da
                            str(age_index+1), "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
             else:
                 command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-learn", "all", "preselect", str(preselect_value), "avoid", "_missing", train_in, kb]
-            # clear knowledge base so failed fit is not covered up by previous successful fit this is
-            # necessary since InteKRator may fail without raising a CalledProcessError and leave knowledge.kb unchanged
+            # clear kb file so result of fit is checked to catch problems that do not raise an error
+            # (for example InteKRator may print out errors into the console but not raise an error)
             with open(kb, 'w') as file:
                 file.write('')
             result = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -140,95 +142,44 @@ def fit(train_data, train_labels, name, cluster_size, kb, train_in="hkb_train_da
                 raise ValueError(f"HKB fitting failed. Check './output/{name}/fit_output.txt' for details.")
 
 
-def check(kb, outfile):
-    command = ["java", "-Xmx4g", "-jar", "InteKRator.jar", "-check", "details", "hkb_train_data.txt", kb, outfile]
-    subprocess.run(command, capture_output=True, text=True, check=True)
-
-
-def save_prediction(hashmap, feature_list, pred_proba):
-    key = tuple(feature_list)
-    hashmap[key] = pred_proba
-
-
-def intekrator_infer(name, item, kb, pred_out=None):
+def intekrator_infer(name, kb, formatted_samples_path, pred_out):
     try:
-        command = (["java", "-jar", "InteKRator.jar", "-infer", "why"]
-                   + shlex.split(item)
-                   + [kb, "inference.txt"])
-        # clear inference file so failed inference is not covered up by previous successful inference, this is
-        # necessary since InteKRator may fail without raising a CalledProcessError and leave inference.txt unchanged
-        with open('inference.txt', 'w') as file:
-            file.write('')
+        command = (["java", "-jar", "InteKRator.jar", "-inferMulti", "why", formatted_samples_path, kb, pred_out])
+        # clear inference file so result of inferMulti is checked to catch problems that do not raise an error
+        # (for example InteKRator may print out errors into the console but not raise an error)
+        with open(pred_out, "w") as file:
+            file.write("")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         with open(f'./output/{name}/infer_output.txt', 'w') as o:
             o.write(result.stdout)
             o.write(result.stderr)
-        with open('inference.txt', 'r') as file:
-            line = file.readline().strip()
-        # this case should never be reached as long as the fit was successful
-        if line == "":
-            raise ValueError(f"No inference possible for state \n{item}.\n"
+        # checks if inferences were made (see above)
+        if os.path.getsize(pred_out) == 0:
+            raise ValueError(f"Inference failed.\n"
                              f"Is the knowledge base empty or without top rule? "
                              f"If not, check './output/{name}/infer_output.txt' for details.")
-        if pred_out:
-            with open(pred_out, 'a') as append_file:
-                append_file.write(line + '\n')
-        return line
     except subprocess.CalledProcessError as e:
         with open(f'./output/{name}/infer_output.txt', 'w') as o:
             o.write(e.stdout)
             o.write(e.stderr)
-        raise ValueError(f"Inference failed for state {item}. Check './output/{name}/infer_output.txt' for details.")
+        raise ValueError(f"Inference failed. Check './output/{name}/infer_output.txt' for details.")
 
 
-class PredictionCache:
-    def __init__(self):
-        self.cache = {}
-
-    def save_prediction(self, feature_list, pred_proba):
-        key = tuple(feature_list)
-        self.cache[key] = pred_proba
-
-    def is_predicted(self, feature_list):
-        key = tuple(feature_list)
-        return key in self.cache
-
-    def get_prediction(self, feature_list):
-        key = tuple(feature_list)
-        return self.cache.get(key)
-
-
-cache = PredictionCache()
-
-
-def predict(data, name, kb, data_out=None, pred_out=None):
+def predict(data, name, kb, formatted_samples_path, pred_out):
     print("Starting inference from HKB.")
-    if pred_out:
-        with open(pred_out, 'w') as file:
-            file.write('')
     data_copy = data.copy()
-    predictions = np.array([])
     convert_cat_features(data_copy)
-    age_index = -1
-    if "age" in data.columns:
-        age_index = data.columns.get_loc("age")
     formatted_data = convert_num_features(data_copy)
-    if data_out:
-        data_to_txt(formatted_data, data_out)
-    for item in formatted_data:
-        if check_state(item, age_index):
-            line = intekrator_infer(name, item, kb, pred_out)
-            prediction = line.split('   (')[0]
-            predictions = np.append(predictions, prediction)
-            if pred_out:
-                with open(pred_out, 'a') as append_file:
-                    append_file.write('\n')
-        else:
-            raise ValueError(f"Invalid format for state {item}.")
+    data_to_txt(formatted_data, formatted_samples_path)
+    intekrator_infer(name, kb, formatted_samples_path, pred_out)
+    predictions = []
+    with open(pred_out, "r") as file:
+        for line in file:
+            prediction = line.split('(')[0].strip()
+            if prediction:  # ignore blank lines from intekrator inferMulti output file
+                predictions.append(prediction)
     print("Inference successful.")
-    if pred_out:
-        print(f"Check {pred_out} for all predictions.")
-    return predictions
+    return np.array(predictions)
 
 
 # computes support and confidence of a rule given a dataset data, the states of the premise of a rule and the
@@ -265,85 +216,28 @@ def compute_support_confidence(data, states, prediction):
 
 # discretized_data_path must lead to the .sa file created during fitting of hkb, the .sa file contains the data used
 # for hkb training with discretized values and is needed for calculating support and confidence to get pred_probas
-def predict_proba(data, name, kb, discretized_data_path, data_out=None, pred_out=None):
-    if pred_out:
-        with open(pred_out, 'w') as file:
-            file.write("")
+def predict_proba(data, name, kb, discretized_data_path, formatted_samples_path, pred_out):
     data_copy = data.copy()
     convert_cat_features(data_copy)
     formatted_data = convert_num_features(data_copy)
-    age_index = -1
-    if "age" in data.columns:
-        age_index = data.columns.get_loc("age")
-    if data_out:
-        data_to_txt(formatted_data, data_out)
+    data_to_txt(formatted_data, formatted_samples_path)
+    intekrator_infer(name, kb, formatted_samples_path, pred_out)
     with open(discretized_data_path, "r") as f:
         discretized_data = f.readlines()
     all_probas = []
-    i = 0 # counter for intekrator infer calls
-    for item in formatted_data:
-        if check_state(item, age_index):
-            sample_states = item.split()
-            if cache.is_predicted(sample_states):
-                all_probas.append(cache.get_prediction(sample_states))
-                continue
-            i += 1
-            line = intekrator_infer(name, item, kb, pred_out)
-            rule = extract_rule(line)
-            states, prediction, cond_proba = tokenize_rule(rule)
+    with open(pred_out, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                rule = extract_rule(line)
+                states, prediction, cond_proba = tokenize_rule(rule)
+                proba_vector = []
+                for cls in CLASS_ORDER:
+                    support, confidence = compute_support_confidence(discretized_data, states, cls)
+                    proba_vector.append(confidence*support)
+                    # print("Conf:", confidence)
+                    # print("Supp:", support)
 
-            proba_vector = []
-            for cls in CLASS_ORDER:
-                support, confidence = compute_support_confidence(discretized_data, states, cls)
-                proba_vector.append(confidence*support)
-                # print("Conf:", confidence)
-                # print("Supp:", support)
-
-            normalized_proba_vector = [proba / sum(proba_vector) for proba in proba_vector]
-            all_probas.append(normalized_proba_vector)
-            cache.save_prediction(sample_states, normalized_proba_vector)
-            if pred_out:
-                with open(pred_out, 'a') as append_file:
-                    append_file.write('\n')
-        else:
-            raise ValueError(f"Invalid format for state {item}.")
-    # print("InteKRator infer runs:", i)
-    # print("Cache size:", len(cache.cache))
+                normalized_proba_vector = [proba / sum(proba_vector) for proba in proba_vector]
+                all_probas.append(normalized_proba_vector)
     return np.array(all_probas)
-
-
-# def predict_proba(data, pred_out='predictions.txt'):
-#     print("Starting inference from HKB.")
-#     with open(pred_out, 'w') as file:
-#         file.write('')
-#     data_copy = data.copy()
-#     convert_cat_features(data_copy)
-#     formatted_data = convert_num_features(data_copy)
-#     data_to_txt(formatted_data)
-#     predictions = np.empty((0, 4))
-#     for item in formatted_data:
-#         if check_state(item):
-#             line = intekrator_infer(item, pred_out)
-#             prediction = line.split('   (')[0]
-#             part1 = line.split('[')[1]
-#             pred_proba_string = part1.split(']')[0]
-#             pred_proba = float(pred_proba_string)
-#             other_proba = (1 - pred_proba)/3
-#             if prediction == "Kein":
-#                 pred_probas = np.array([pred_proba, other_proba, other_proba, other_proba])
-#             elif prediction == "RA":
-#                 pred_probas = np.array([other_proba, pred_proba, other_proba, other_proba])
-#             elif prediction == "SpA":
-#                 pred_probas = np.array([other_proba, other_proba, pred_proba, other_proba])
-#             elif prediction == "PsA":
-#                 pred_probas = np.array([other_proba, other_proba, other_proba, pred_proba])
-#             else:
-#                 raise ValueError(f"Predicted label {prediction} is not valid.")
-#             with open(pred_out, 'a') as append_file:
-#                 append_file.write(str(pred_probas) + '\n')
-#                 append_file.write('\n')
-#             predictions = np.append(predictions, [pred_probas], axis=0)
-#         else:
-#             raise ValueError(f"Invalid format for state {item}.")
-#     print(f"Inference successful. Check {pred_out} for all predictions.")
-#     return predictions

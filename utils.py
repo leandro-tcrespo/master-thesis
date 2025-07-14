@@ -50,10 +50,10 @@ def subsample_data(data, labels, seed):
     return data_res, labels_res
 
 
-def get_predicted_labels(model, data, name=None, kb=None, pred_out=None):
+def get_predicted_labels(model, data, name=None, kb=None, formatted_samples_path=None, pred_out=None):
     if model == "hkb":
         class_names = hkb.CLASS_ORDER
-        preds = hkb.predict(data, name, kb, pred_out=pred_out)
+        preds = hkb.predict(data, name, kb, formatted_samples_path, pred_out)
         predicted_inds = [hkb.CLASS_ORDER.index(pred) for pred in preds]
     else:
         class_names = model.steps[-1][1].classes_

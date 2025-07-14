@@ -177,7 +177,7 @@ class PredictProbaWrapper:
     def __call__(self, data):
         df = pd.DataFrame(data, columns=self.feature_names)
         if self.model == "hkb":
-            print("Input samples:", len(df))
+            # print("Input samples:", len(df))
             preds = hkb.predict_proba(df, self.name, self.kb, self.discretized_data_path, self.formatted_samples_path,
                                       self.pred_out)
             return preds

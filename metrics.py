@@ -64,7 +64,6 @@ def faithfulness_corr(model, input_sample, attributions, feature_names, baseline
 
     input_df = pd.DataFrame([input_sample], columns=feature_names)
     if model == "hkb":
-        print(formatted_samples_path)
         original_probs = hkb.predict_proba(input_df, name, kb, discretized_data_path, formatted_samples_path,
                                            pred_out).flatten()
     else:

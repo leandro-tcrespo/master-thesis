@@ -72,9 +72,11 @@ def explain_model(
                                              name=f"./output/{name}/shap/plots/shap_plot_{model_type}_")
 
     metric_results_shap = metrics.score_explain(model, explain_data, shap_attribution_arrays, feature_names, baseline,
-                                                pred_inds, seed, kb, name, discretized_data_path)
+                                                pred_inds, seed, kb, name, discretized_data_path,
+                                                formatted_samples_path, pred_out)
     metric_results_lime = metrics.score_explain(model, explain_data, lime_attribution_arrays, feature_names, baseline,
-                                                pred_inds, seed, kb, name, discretized_data_path)
+                                                pred_inds, seed, kb, name, discretized_data_path,
+                                                formatted_samples_path, pred_out)
 
     np.savetxt(f"./output/{name}/pred_strings.txt", pred_strings, fmt="%s")
 

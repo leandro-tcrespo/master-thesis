@@ -6,12 +6,13 @@ import matplotlib.patches as mpatches
 from lime import lime_tabular
 from matplotlib.offsetbox import AnchoredText
 
+import dt
 import hkb
 import metrics
 import utils
 
 
-def explain_model(
+def fi_explain(
     model,
     explain_data,
     background_data,
@@ -65,22 +66,40 @@ def explain_model(
     if plot_explanations:
         model_type = name.split("_")[0]
         plot_lime_explanations(lime_explanations,
-                                             pred_inds,
-                                             f"./output/{name}/lime/plots/lime_plot_{model_type}_")
+                               pred_inds,
+                               f"./output/{name}/lime/plots/lime_plot_{model_type}_")
         plot_shap_explanations(shap_explanations,
-                                             pred_strings,
-                                             name=f"./output/{name}/shap/plots/shap_plot_{model_type}_")
+                               pred_strings,
+                               f"./output/{name}/shap/plots/shap_plot_{model_type}_")
 
-    metric_results_shap = metrics.score_explain(model, explain_data, shap_attribution_arrays, feature_names, baseline,
-                                                pred_inds, seed, kb, name, discretized_data_path,
-                                                formatted_samples_path, pred_out)
-    metric_results_lime = metrics.score_explain(model, explain_data, lime_attribution_arrays, feature_names, baseline,
-                                                pred_inds, seed, kb, name, discretized_data_path,
-                                                formatted_samples_path, pred_out)
+    metric_results_shap = metrics.score_fi_exp(model, explain_data, shap_attribution_arrays, feature_names, baseline,
+                                               pred_inds, seed, kb, name, discretized_data_path,
+                                               formatted_samples_path, pred_out)
+    metric_results_lime = metrics.score_fi_exp(model, explain_data, lime_attribution_arrays, feature_names, baseline,
+                                               pred_inds, seed, kb, name, discretized_data_path,
+                                               formatted_samples_path, pred_out)
 
     np.savetxt(f"./output/{name}/pred_strings.txt", pred_strings, fmt="%s")
 
     return metric_results_shap, metric_results_lime, shap_attribution_arrays, lime_attribution_arrays
+
+
+def model_explain(model, explain_data, name):
+    if isinstance(model, str):
+        metric_results, feature_counts = metrics.score_model_exp(model, explain_data)
+        metrics.plot_normalized_frequencies(feature_counts, f"./output/{name}/model_exp/plots/hkb_feature_freq_plot.png")
+        # hkb.predict(explain_data, "", model, "temp_formatted_samples.txt", f"./output/{name}/hkb_preds.txt")
+        rules = hkb.get_rules(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
+        hkb.data_to_txt(rules, f"./output/{name}/model_exp/used_rules.txt")
+    else:
+        transformer = model["columntransformer"]
+        dtclassifier = model["decisiontreeclassifier"]
+        feature_names = transformer.get_feature_names_out()
+        explain_data_transformed = transformer.transform(explain_data)
+        metric_results, feature_counts = metrics.score_model_exp(dtclassifier, explain_data_transformed, feature_names)
+        metrics.plot_normalized_frequencies(feature_counts, f"./output/{name}/model_exp/plots/dt_feature_freq_plot.png")
+        dt.plot_tree_path(model, explain_data_transformed, feature_names, f"./output/{name}/model_exp/plots/exp_dt_")
+    return metric_results
 
 
 def plot_lime_explanations(explanations, pred_inds, name):

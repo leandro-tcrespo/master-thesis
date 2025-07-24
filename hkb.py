@@ -42,6 +42,48 @@ def tokenize_rule(rule):
     return states, prediction, cond_proba
 
 
+def get_rules(data, name, kb, formatted_samples_path, pred_out):
+    data_copy = data.copy()
+    convert_cat_features(data_copy)
+    formatted_data = convert_num_features(data_copy)
+    data_to_txt(formatted_data, formatted_samples_path)
+    intekrator_infer(name, kb, formatted_samples_path, pred_out)
+    rules = []
+    with open(pred_out, "r") as file:
+        new_pred_block = True
+        for line in file:
+            prediction = line.split('(')[0].strip()
+            if not prediction:                                    # blank lines mark new prediction blocks
+                new_pred_block = True
+            elif new_pred_block:                                  # new prediction block => take first prediction
+                rule = extract_rule(line)
+                rules.append(rule)
+                new_pred_block = False                            # no alternative predictions are added after the first
+    return rules
+
+
+
+def get_premises(data, name, kb, formatted_samples_path, pred_out):
+    data_copy = data.copy()
+    convert_cat_features(data_copy)
+    formatted_data = convert_num_features(data_copy)
+    data_to_txt(formatted_data, formatted_samples_path)
+    intekrator_infer(name, kb, formatted_samples_path, pred_out)
+    premises = []
+    with open(pred_out, "r") as file:
+        new_pred_block = True
+        for line in file:
+            prediction = line.split('(')[0].strip()
+            if not prediction:                                    # blank lines mark new prediction blocks
+                new_pred_block = True
+            elif new_pred_block:                                  # new prediction block => take first prediction
+                rule = extract_rule(line)
+                states, _, _ = tokenize_rule(rule)
+                premises.append(states)
+                new_pred_block = False                            # no alternative predictions are added after the first
+    return premises
+
+
 def convert_cat_features(df):
     for col in df.columns:
         if col == 'sex':
@@ -174,10 +216,14 @@ def predict(data, name, kb, formatted_samples_path, pred_out):
     intekrator_infer(name, kb, formatted_samples_path, pred_out)
     predictions = []
     with open(pred_out, "r") as file:
+        new_pred_block = True
         for line in file:
             prediction = line.split('(')[0].strip()
-            if prediction:  # ignore blank lines from intekrator inferMulti output file
+            if not prediction:                               # blank lines mark new prediction blocks
+                new_pred_block = True
+            elif new_pred_block:                             # new prediction block => take first prediction
                 predictions.append(prediction)
+                new_pred_block = False                       # no alternative predictions are added after the first
     print("Inference successful.")
     return np.array(predictions)
 

@@ -36,7 +36,7 @@ background_data = train_data
 background_data_res, background_labels_res = utils.subsample_data(train_data, train_labels, seed)
 feature_names = feature_loader.no_lab_features
 
-hkb_results_shap, hkb_results_lime, _, _ = explain_utils.explain_model(
+hkb_results_shap, hkb_results_lime, _, _ = explain_utils.fi_explain(
     "hkb", explain_data, background_data, feature_names, baseline, seed, True, "hkb_0.kb",
     results_path_hkb, "hkb_0_discretized.sa",
     "temp_samples.txt", "temp_predictions.txt"
@@ -48,7 +48,7 @@ with open(f"./output/{results_path_hkb}/explain_results_hkb_lime.json", "w") as 
     json.dump(hkb_results_lime, f, indent=4)
 
 
-hkb_results_shap2, hkb_results_lime2, _, _ = explain_utils.explain_model(
+hkb_results_shap2, hkb_results_lime2, _, _ = explain_utils.fi_explain(
     "hkb", explain_data, background_data_res, feature_names, baseline, seed, True, "hkb_0.kb",
     results_path_hkb_res, "hkb_0_discretized.sa",
     "temp_samples.txt", "temp_predictions.txt"

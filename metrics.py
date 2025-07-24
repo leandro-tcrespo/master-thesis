@@ -2,8 +2,9 @@ import json
 
 import numpy as np
 from imblearn.metrics import specificity_score
+from matplotlib import pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from scipy.stats import pearsonr
+from collections import Counter
 import pandas as pd
 
 import hkb
@@ -54,10 +55,9 @@ def avg_complexities(all_attributions):
 # implementation of faithfulness correlation as defined in
 # "Evaluating and Aggregating Feature-based Model Explanations" - https://arxiv.org/abs/2005.00631
 # implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
-def faithfulness_corr(model, input_sample, attributions, feature_names, baseline, label, seed, name, kb,
+def faithfulness_corr(model, input_sample, attributions, feature_names, baseline, label, name, kb,
                       discretized_data_path, formatted_samples_path, pred_out, n_repeats=20,
-                      n_features_subset=5,):
-    np.random.seed(seed)
+                      n_features_subset=3,):
     # floats, so the mean value for age from the baseline is used when replacing indices for perturbed array
     input_sample = np.array(input_sample).astype(float)
     baseline = np.array(baseline)
@@ -103,28 +103,88 @@ def faithfulness_corr(model, input_sample, attributions, feature_names, baseline
 
 def avg_faithfulness_corr(model, data, all_attributions, feature_names, baseline, labels, seed, name, kb,
                           discretized_data_path, formatted_samples_path, pred_out):
+    np.random.seed(seed)
     data = np.array(data)
     faithfulness_scores = []
     for i, sample in enumerate(data):
         faithfulness_scores.append(
-            faithfulness_corr(model, sample, all_attributions[i], feature_names, baseline, labels[i], seed, name,
+            faithfulness_corr(model, sample, all_attributions[i], feature_names, baseline, labels[i], name,
                               kb, discretized_data_path, formatted_samples_path, pred_out))
     if np.nan in faithfulness_scores:
         print("Some faithfulness_scores are nan. Ignoring nan values for mean score.")
-    return faithfulness_scores, np.nanmean(faithfulness_scores),
+    return faithfulness_scores, np.nanmean(faithfulness_scores)
 
 
+def avg_explanation_length(model, explain_data):
+    if isinstance(model, str):
+        premises = hkb.get_premises(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
+        premise_lengths = []
+        for premise in premises:
+            premise_lengths.append(len(premise))
+        return np.mean(premise_lengths)
+    else:
+        # returns (samples, nodes) sparse matrix where for each sample i and node j (i,j)=1 if sample passed through
+        # node and (i,j)=0 if sample did not
+        decision_paths = model.decision_path(explain_data)
+        # sums up all nodes each sample passes through (sums up all ones), axis=1 because nodes are the columns
+        path_lengths = decision_paths.sum(axis=1).flatten()
+        # remove leaf node to only consider decision splits
+        return np.mean(path_lengths-1)
+
+
+def count_features(model, explain_data, feature_names=None):
+    feature_counts = Counter()
+    if isinstance(model, str):
+        premises = hkb.get_premises(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
+        for premise in premises:
+            for feature in premise:
+                feature_counts[feature] += 1
+    else:
+        paths = model.decision_path(explain_data)
+        features = model.tree_.feature
+
+        for path in paths:
+            path_nodes = path.nonzero()
+            path_nodes = path_nodes[1]
+            for node in path_nodes:
+                feature_id = features[node]
+                if feature_id >= 0:
+                    feature_counts[feature_names[feature_id]] += 1
+
+    return feature_counts
+
+
+def plot_normalized_frequencies(counter, name):
+    total = sum(counter.values())
+    normalized = {k: v / total for k, v in counter.items()}
+
+    features = list(normalized.keys())
+    frequencies = list(normalized.values())
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(features, frequencies)
+    plt.xlabel('Features')
+    plt.ylabel('Normalized Frequency')
+    plt.title('Normalized Feature Usage Frequencies')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f"{name}.png")
+    plt.close()
+    return
+
+# calcs baseline for faithfulness correlation by taking modes for categorical features and mean for age feature
 def get_baseline(df):
     # get first row in case some modes are tied for some features
     feature_vector = df.mode().iloc[0]
+    # after getting modes for all categorical features, overwrite value for age feature with mean
     if "age" in df.columns:
         feature_vector["age"] = df["age"].mean()
     return feature_vector.to_numpy()
 
 
 # Calculate metrics
-def score_explain(model, explain_data, all_attributions, feature_names,
-                  baseline, pred_inds, seed, kb, name, discretized_data_path, formatted_samples_path, pred_out):
+def score_fi_exp(model, explain_data, all_attributions, feature_names,
+                 baseline, pred_inds, seed, kb, name, discretized_data_path, formatted_samples_path, pred_out):
     cmplx_scores, cmplx_avg = avg_complexities(all_attributions)
     fthfl_scores, fthfl_avg = avg_faithfulness_corr(model, explain_data, all_attributions, feature_names, baseline,
                                                     pred_inds, seed, name, kb, discretized_data_path,
@@ -138,3 +198,14 @@ def score_explain(model, explain_data, all_attributions, feature_names,
                 "fthfl_avg": fthfl_avg,
                      }
     return metric_results
+
+
+def score_model_exp(model, explain_data, feature_names=None):
+    exp_length_avg = avg_explanation_length(model, explain_data)
+    feature_counts = count_features(model, explain_data, feature_names)
+    feature_counts_json = json.dumps(feature_counts)
+    metric_results = {
+        "exp_length_avg": exp_length_avg,
+        "feature_counts": feature_counts_json
+    }
+    return metric_results, feature_counts

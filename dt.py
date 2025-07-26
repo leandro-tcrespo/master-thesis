@@ -41,7 +41,8 @@ def plot_dt(grid_dt, out_file):
         filled=True,
         rounded=True
     )
-    plt.savefig(out_file, dpi=300, bbox_inches="tight")  # Save as PNG
+    plt.savefig(out_file, dpi=300, bbox_inches="tight")
+    plt.close()
     # plt.show()
 
 
@@ -55,14 +56,14 @@ def plot_dt_without_grid(dt, out_file):
         rounded=True
     )
 
-    plt.savefig(out_file, dpi=300, bbox_inches="tight")  # Save as PNG
+    plt.savefig(out_file, dpi=300, bbox_inches="tight")
     plt.close()
     # plt.show()
 
 
 def plot_tree_path(dt, explain_data, feature_names, name):
     dtclassifier = dt["decisiontreeclassifier"]
-    scaler = dt["columntransformer"]["AgeScaler"]  # Example: scaler for 'Age'
+    scaler = dt["columntransformer"].named_transformers_["AgeScaler"]
     for j, sample in enumerate(explain_data):
         node_indicator = dtclassifier.decision_path(sample.reshape(1, -1))
         node_index = node_indicator.indices[node_indicator.indptr[0]:node_indicator.indptr[1]]

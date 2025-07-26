@@ -34,13 +34,13 @@ def fi_explain(
         predict_proba = PredictProbaWrapper(model, feature_names)
         class_names = model.steps[-1][1].classes_
 
-    shap_explainer = shap.Explainer(predict_proba,
-                                    background_data,
-                                    feature_names=feature_names,
-                                    seed=seed,
-                                    max_evals=(2*len(feature_names)+1)*10,
-                                    output_names=class_names
-                                    )
+    shap_explainer = shap.PermutationExplainer(predict_proba,
+                                               background_data,
+                                               feature_names=feature_names,
+                                               seed=seed,
+                                               max_evals=(2*len(feature_names)+1)*10,
+                                               output_names=class_names
+                                               )
 
     lime_explainer = lime_tabular.LimeTabularExplainer(training_data=background_data.to_numpy(),
                                                        feature_names=feature_names,
@@ -88,7 +88,6 @@ def model_explain(model, explain_data, name):
     if isinstance(model, str):
         metric_results, feature_counts = metrics.score_model_exp(model, explain_data)
         metrics.plot_normalized_frequencies(feature_counts, f"./output/{name}/model_exp/plots/hkb_feature_freq_plot.png")
-        # hkb.predict(explain_data, "", model, "temp_formatted_samples.txt", f"./output/{name}/hkb_preds.txt")
         rules = hkb.get_rules(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
         hkb.data_to_txt(rules, f"./output/{name}/model_exp/used_rules.txt")
     else:

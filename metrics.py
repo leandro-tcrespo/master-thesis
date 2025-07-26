@@ -196,6 +196,7 @@ def score_fi_exp(model, explain_data, all_attributions, feature_names,
                 "cmplx_avg": cmplx_avg,
                 "fthfl_scores": fthfl_scores_json,
                 "fthfl_avg": fthfl_avg,
+                "seed": seed,
                      }
     return metric_results
 

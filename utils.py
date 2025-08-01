@@ -44,12 +44,6 @@ def count_labels(labels):
     return resampled_counts
 
 
-def subsample_data(data, labels, seed):
-    rus = RandomUnderSampler(sampling_strategy="majority", random_state=seed) # todo: include in thesis that random undersampling is not optimal since samples with "unclear" decision boundaries could be chosen, clustering would be better but would have to be treated with care because of the categorical features
-    data_res, labels_res = rus.fit_resample(data, labels)
-    return data_res, labels_res
-
-
 def get_predicted_labels(model, data, name=None, kb=None, formatted_samples_path=None, pred_out=None):
     if model == "hkb":
         class_names = hkb.CLASS_ORDER

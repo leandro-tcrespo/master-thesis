@@ -4,14 +4,12 @@ import pickle
 
 import numpy as np
 import pandas as pd
-import shap
-from lime import lime_tabular
-from sklearn.model_selection import train_test_split
+from imblearn.under_sampling import ClusterCentroids
 
 import feature_loader
-import hkb
 import explain_utils
 import metrics
+import preprocessing
 import utils
 
 
@@ -59,16 +57,20 @@ with open('dt.pkl', 'rb') as file:
 with open('mlp.pkl', 'rb') as file:
     mlp = pickle.load(file)
 
-data = pd.read_csv("../data/data.csv", header=0)
-X = data[feature_loader.no_lab_features]
-y = data[['diag_multi']]
-train_data, test_data, train_labels, test_labels = train_test_split(X, y, test_size=0.25, random_state=598398916)
+train_data, test_data, train_labels, test_labels, enc, _, _, _, _ = preprocessing.preprocess_data("../data/data.csv", feature_loader.no_lab_features, 598398916)
 
-baseline = metrics.get_baseline(X)
+# "Hardcode" resampling, so "Kein" samples are subsampled to same sample size as "RA"
+explain_resampler = ClusterCentroids(sampling_strategy={"Kein": 23, "SpA":8, "PsA":23, "RA":22}, random_state=seed, voting="hard")
+background_resampler = ClusterCentroids(sampling_strategy={"Kein": 74, "SpA":25, "PsA":54, "RA":74}, random_state=seed, voting="hard")
+
+baseline = metrics.get_baseline(pd.concat([train_data, test_data]))
 explain_data = test_data
-explain_data_res, explain_labels_res = utils.subsample_data(test_data, test_labels, seed)
+# note that this fits the encoder on the test data, this is necessary here since the main goal is to correctly represent
+# the feature diversity in the test data, this would not necessarily be the case if the encoder fit on train data would
+# be used since there may be features that appear in the test data but not in the train data, those features would be ignored
+explain_data_res, explain_labels_res = utils.resample_data(enc, test_data, test_labels, us=explain_resampler)
 background_data = train_data
-background_data_res, background_labels_res = utils.subsample_data(train_data, train_labels, seed)
+background_data_res, background_labels_res = utils.resample_data(enc, train_data, train_labels, us=background_resampler)
 feature_names = feature_loader.no_lab_features
 
 background_label_count = utils.count_labels(train_labels).to_json()
@@ -80,6 +82,10 @@ label_counts = {"Background data:": background_label_count,
                 "Background data resampled:": background_label_res_count,
                 "Explain data:": explain_label_count,
                 "Explain data resampled:": explain_label_res_count}
+
+# saving explain data for eventual further visualizations of the model explanations, not stored in ./output, so I don't see the data
+explain_data.to_pickle("explain_data.pkl")
+explain_data_res.to_pickle("explain_data_res.pkl")
 
 with open(f"./output/label_counts.json", "w") as f:
     json.dump(label_counts, f, indent=4)
@@ -192,8 +198,3 @@ hkb_results_model_exp2 = explain_utils.model_explain("hkb.kb", explain_data_res,
 
 with open(f"./output/{results_path_hkb_data_res}/explain_results_hkb_model_exp.json", "w") as f:
     json.dump(hkb_results_model_exp2, f, indent=4)
-
-########################################################################################################################
-# One-Time Prediction for HKB on whole Train Data to check how many "multi" predictions InteKRator makes
-########################################################################################################################
-hkb.predict(X, "", "hkb.kb", "temp_formatted_samples.txt", "./output/all_hkb_preds.txt")

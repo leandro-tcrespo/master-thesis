@@ -154,19 +154,31 @@ def count_features(model, explain_data, feature_names=None):
     return feature_counts
 
 
-def plot_normalized_frequencies(counter, name):
-    total = sum(counter.values())
-    normalized = {k: v / total for k, v in counter.items()}
+def plot_feature_frequencies(counter, name):
+    grouped = {}
+    for feature, count in counter.items():
+        # Remove _number suffix if it exists
+        base_name = feature.split('_')[0] if '_' in feature else feature
 
-    features = list(normalized.keys())
-    frequencies = list(normalized.values())
+        if base_name in ['male', 'female']:
+            base_name = 'sex'
+        elif base_name == 'Alter':
+            base_name = 'age'
+
+        grouped[base_name] = grouped.get(base_name, 0) + count
+
+    # Sort by frequency (highest first)
+    sorted_features = sorted(grouped.items(), key=lambda x: x[1], reverse=True)
+    features, frequencies = zip(*sorted_features)
 
     plt.figure(figsize=(10, 6))
     plt.bar(features, frequencies)
     plt.xlabel('Features')
-    plt.ylabel('Normalized Frequency')
-    plt.title('Normalized Feature Usage Frequencies')
+    plt.ylabel('Usage Frequency')
     plt.xticks(rotation=45, ha='right')
+
+    plt.gca().yaxis.set_ticks([])
+
     plt.tight_layout()
     plt.savefig(f"{name}.png")
     plt.close()

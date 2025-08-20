@@ -87,7 +87,7 @@ def fi_explain(
 def model_explain(model, explain_data, name):
     if isinstance(model, str):
         metric_results, feature_counts = metrics.score_model_exp(model, explain_data)
-        metrics.plot_normalized_frequencies(feature_counts, f"./output/{name}/model_exp/plots/hkb_feature_freq_plot.png")
+        metrics.plot_feature_frequencies(feature_counts, f"./output/{name}/model_exp/plots/hkb_feature_freq_plot.png")
         rules = hkb.get_rules(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
         hkb.data_to_txt(rules, f"./output/{name}/model_exp/used_rules.txt")
     else:
@@ -96,7 +96,7 @@ def model_explain(model, explain_data, name):
         feature_names = transformer.get_feature_names_out()
         explain_data_transformed = transformer.transform(explain_data)
         metric_results, feature_counts = metrics.score_model_exp(dtclassifier, explain_data_transformed, feature_names)
-        metrics.plot_normalized_frequencies(feature_counts, f"./output/{name}/model_exp/plots/dt_feature_freq_plot.png")
+        metrics.plot_feature_frequencies(feature_counts, f"./output/{name}/model_exp/plots/dt_feature_freq_plot.png")
         dt.plot_tree_path(model, explain_data_transformed, feature_names, f"./output/{name}/model_exp/plots/exp_dt_")
     return metric_results
 
@@ -107,9 +107,12 @@ def plot_lime_explanations(explanations, pred_inds, name):
         green_patch = mpatches.Patch(color='green', label='Supports Prediction')
         red_patch = mpatches.Patch(color='red', label='Contradicts Prediction')
         plt.legend(handles=[green_patch, red_patch], loc='lower left', bbox_to_anchor=(1.02, 0))
-        proba_text = 'Prediction Probabilities\n' + '\n'.join(
-            [f'{name}: {prob:.2f}' for name, prob in zip(explanation.class_names, explanation.predict_proba)]
-        )
+
+        predicted_class_prob = explanation.predict_proba[pred_inds[i]]
+        lime_prediction = explanation.local_pred[0]
+        intercept = explanation.intercept[pred_inds[i]]
+
+        proba_text = f'Model Prediction: {predicted_class_prob:.3f}\nLIME Prediction: {lime_prediction:.3f}\nIntercept: {intercept:.3f}'
         prob_box = AnchoredText(proba_text,
                                 loc='lower left',
                                 bbox_to_anchor=(1.04, 0.15),

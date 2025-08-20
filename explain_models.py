@@ -19,6 +19,7 @@ def make_folders(path):
         os.makedirs(f"./output/{path}/lime/plots", exist_ok=True)
     if "bg" not in path and "both" not in path and "mlp" not in path:
         os.makedirs(f"./output/{path}/model_exp/plots", exist_ok=True)
+    os.makedirs("./explain_data_backups", exist_ok=True)
 
 
 results_path_mlp = "mlp_exp"
@@ -84,8 +85,8 @@ label_counts = {"Background data:": background_label_count,
                 "Explain data resampled:": explain_label_res_count}
 
 # saving explain data for eventual further visualizations of the model explanations, not stored in ./output, so I don't see the data
-explain_data.to_pickle("explain_data.pkl")
-explain_data_res.to_pickle("explain_data_res.pkl")
+explain_data.to_pickle("./explain_data_backups/explain_data.pkl")
+explain_data_res.to_pickle("./explain_data_backups/explain_data_res.pkl")
 
 with open(f"./output/label_counts.json", "w") as f:
     json.dump(label_counts, f, indent=4)

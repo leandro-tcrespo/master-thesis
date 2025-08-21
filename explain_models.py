@@ -50,7 +50,7 @@ make_folders(results_path_hkb_data_res)
 make_folders(results_path_mlp_both_res)
 make_folders(results_path_dt_both_res)
 
-seed = np.random.randint(0, 2 ** 31 - 1)
+seed = 681534355
 
 with open('dt.pkl', 'rb') as file:
     dt = pickle.load(file)

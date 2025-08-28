@@ -5,11 +5,11 @@ from sklearn.tree import plot_tree
 # Param grid for Hyperparameter-Tuning.
 param_grid = {
     "decisiontreeclassifier__criterion": ["gini", "entropy"],
-    # "decisiontreeclassifier__max_depth": [3, 5, 7, 10, 15, None],
-    # "decisiontreeclassifier__min_samples_split": [2, 5, 10, 20, 30],
-    # "decisiontreeclassifier__min_samples_leaf": [1, 2, 4, 8, 16],
-    # "decisiontreeclassifier__min_impurity_decrease": [0.0, 0.01],
-    # "decisiontreeclassifier__max_leaf_nodes": [10, 20, 50, 100, 200, None]
+    "decisiontreeclassifier__max_depth": [3, 5, 7, 10, 15, None],
+    "decisiontreeclassifier__min_samples_split": [2, 5, 10, 20, 30],
+    "decisiontreeclassifier__min_samples_leaf": [1, 2, 4, 8, 16],
+    "decisiontreeclassifier__min_impurity_decrease": [0.0, 0.01],
+    "decisiontreeclassifier__max_leaf_nodes": [10, 20, 50, 100, 200, None]
 }
 
 

@@ -2,51 +2,53 @@ import os
 
 from keras.src.regularizers import regularizers
 
-# turns off warnings about onednn custom operations being on and available CPU instructions for potential better perf
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+# Suppresses warnings about onednn custom operations being on and available CPU instructions for potential better perf.
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 import tensorflow as tf
 from keras import Sequential, Input
 from keras.src.layers import Dense, Dropout, BatchNormalization
 from keras.src.optimizers import Adam
-from keras.src.callbacks import Callback
 from scikeras.wrappers import KerasClassifier
 from sklearn.model_selection import GridSearchCV
 from keras.src.optimizers.schedules import ExponentialDecay
-from keras import backend
-# this is to suppress warnings about retracing tf.function calls when predicting data, this probably happens because for
-# each fold in the cv a new model is created as a python object and thus tensorflow sees each model as a separate
+
+# This is to suppress warnings about retracing tf.function calls when predicting data, this probably happens because for
+# each fold in the cv a new model is created as a Python object and thus Tensorflow sees each model as a separate
 # entity, so it cannot use cached data and has to retrace the tf.function call for the new model, note that the
 # tf.function call that is retraced each fold is the predict function (one_step_on_data_distributed),
-# which is wrapped in a tf.function in trainer.py:285 (found in keras package)
-tf.get_logger().setLevel('ERROR')
+# which is wrapped in a tf.function in trainer.py:285 (found in Keras library)
+tf.get_logger().setLevel("ERROR")
 
 
+# Configurations for Learning Rate Decay.
 schedules = [ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay_rate=0.9),
              ExponentialDecay(initial_learning_rate=0.001, decay_steps=100, decay_rate=0.8),
              ExponentialDecay(initial_learning_rate=0.001, decay_steps=200, decay_rate=0.8),
              ]
 
+# Param grid for Hyperparameter-Tuning.
 param_grid = {
-    'kerasclassifier__optimizer__learning_rate': schedules,
-    'kerasclassifier__batch_size': [32, 64],
-    'kerasclassifier__units': [32, 64],
-    'kerasclassifier__activation': ['relu', 'leaky_relu'],
-    'kerasclassifier__num_layers': [2, 3],
-    'kerasclassifier__epochs': [100, 150],
-    'kerasclassifier__l2': [0.0, 1e-5, 1e-4]
+    "kerasclassifier__optimizer__learning_rate": schedules,
+    # "kerasclassifier__batch_size": [32, 64],
+    # "kerasclassifier__units": [32, 64],
+    # "kerasclassifier__activation": ["relu", "leaky_relu"],
+    # "kerasclassifier__num_layers": [2, 3],
+    # "kerasclassifier__epochs": [100, 150],
+    # "kerasclassifier__l2": [0.0, 1e-5, 1e-4]
 }
 
 
-# fit method for hyperparameter tuning through grid search
+# Creates GridSearchCV object and fits that object for Hyperparameter-Tuning.
 def fit(model, train_data, train_labels):
-    grid_model = GridSearchCV(model, param_grid=param_grid, cv=5, n_jobs=-1, scoring='f1_macro',
-                              error_score='raise')
+    grid_model = GridSearchCV(model, param_grid=param_grid, cv=5, n_jobs=-1, scoring="f1_macro",
+                              error_score="raise")
 
     grid_model.fit(train_data, train_labels.values.ravel())
     return grid_model
 
 
-# function that gets called by scikeras to build model
+# Gets called by SciKeras to build Keras MLP. Architecture of MLP is configured by given parameters (num_layers,
+# use_batchnorm1, etc.). These parameters can be tuned via GridSearchCV after wrapping the model with KerasClassifier.
 def create_model(meta, dropout_rate, activation,
                  units,
                  num_layers,
@@ -54,8 +56,8 @@ def create_model(meta, dropout_rate, activation,
                  use_batchnorm2=False, use_dropout2=True,
                  use_batchnorm3=True, use_dropout3=True,
                  l2=0.0):
-    # meta is a dict with attributes of kerasclassifier after it is initialized, containing info like input shape,
-    # number of classes etc, it is created after fit is called on the kerasclassifier and before the actual fitting
+    # meta is a dict with attributes of KerasClassifier after it is initialized, containing info like input shape,
+    # number of classes etc, it is created after fit, is called on the KerasClassifier and before the actual fitting.
     n_features_in_ = meta["n_features_in_"]
     model = Sequential()
     model.add(Input(shape=(n_features_in_,)))
@@ -82,17 +84,11 @@ def create_model(meta, dropout_rate, activation,
         if use_dropout3:
             model.add(Dropout(dropout_rate))
 
-    model.add(Dense(4, activation='softmax'))
+    model.add(Dense(4, activation="softmax"))
     return model
 
 
-# get an overview over models during cv-folds, for debugging, can be passed as callback function to KerasClassifier
-class PrintModelDetails(Callback):
-    def on_train_begin(self, logs=None):
-        print("Model Summary:")
-        self.model.summary()
-
-
+# Wraps a Keras MLP with KerasClassifier so it can be used in SKLearn. Calls create_model to build the Keras MLP.
 def get_keras_model():
     keras_estimator = KerasClassifier(
         units=64,
@@ -103,13 +99,12 @@ def get_keras_model():
         epochs=100,
         batch_size=32,
         verbose=0,
-        activation='relu',
+        activation="relu",
         dropout_rate=0.1,
         optimizer=Adam,
         num_layers=2,
         l2=0.0,
         random_state=42,
-        # fit__callbacks=[PrintModelDetails(),],
-        loss='sparse_categorical_crossentropy'
+        loss="sparse_categorical_crossentropy"
     )
     return keras_estimator

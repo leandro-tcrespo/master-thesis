@@ -10,9 +10,10 @@ import pandas as pd
 import hkb
 
 
+# Calculates prediction quality metrics.
 def score(y_true, y_pred, modelname, filename):
 
-    label_order = ['Kein','PsA','RA','SpA']
+    label_order = ["Kein","PsA","RA","SpA"]
 
     accuracy = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, labels=label_order, average=None, zero_division=0.0)
@@ -34,9 +35,9 @@ def score(y_true, y_pred, modelname, filename):
     print("---------------------------------------------------------", file=filename)
 
 
-# implementation of complexity measure as defined in "Evaluating and Aggregating Feature-based Model Explanations" -
-# https://arxiv.org/abs/2005.00631
-# implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
+# Implementation of complexity measure as defined in:
+# "Evaluating and Aggregating Feature-based Model Explanations" - https://arxiv.org/abs/2005.00631
+# Implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
 def compute_complexity(attributions):
     abs_attributions = np.abs(attributions)
     P_g = abs_attributions / (np.sum(abs_attributions) + 1e-10)
@@ -46,15 +47,16 @@ def compute_complexity(attributions):
     return complexity
 
 
+# Averages complexities.
 def avg_complexities(all_attributions):
     complexities = [compute_complexity(attributions) for attributions in all_attributions]
     mean_complexity = np.mean(complexities) if complexities else 0
     return complexities, mean_complexity
 
 
-# implementation of faithfulness correlation as defined in
+# Implementation of faithfulness correlation as defined in:
 # "Evaluating and Aggregating Feature-based Model Explanations" - https://arxiv.org/abs/2005.00631
-# implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
+# Implementation similar to BEExAI implementation - https://github.com/SquareResearchCenter-AI/BEExAI/tree/main
 def faithfulness_corr(model, input_sample, attributions, feature_names, baseline, label, name, kb,
                       discretized_data_path, formatted_samples_path, pred_out, n_repeats=20,
                       n_features_subset=3,):
@@ -101,6 +103,7 @@ def faithfulness_corr(model, input_sample, attributions, feature_names, baseline
     return np.corrcoef(prediction_diffs, attribution_sums)[0, 1]
 
 
+# Averages faithfulness correlation.
 def avg_faithfulness_corr(model, data, all_attributions, feature_names, baseline, labels, seed, name, kb,
                           discretized_data_path, formatted_samples_path, pred_out):
     np.random.seed(seed)
@@ -115,6 +118,8 @@ def avg_faithfulness_corr(model, data, all_attributions, feature_names, baseline
     return faithfulness_scores, np.nanmean(faithfulness_scores)
 
 
+# Calculates average explanation lengths as defined in:
+# "Decision Trees with Short Explainable Rules" - https://proceedings.neurips.cc/paper_files/paper/2022/hash/500637d931d4feb99d5cce84af1f53ba-Abstract-Conference.html
 def avg_explanation_length(model, explain_data):
     if isinstance(model, str):
         premises = hkb.get_premises(explain_data, "", model, "temp_formatted_samples.txt", "temp_preds.txt")
@@ -132,6 +137,9 @@ def avg_explanation_length(model, explain_data):
         return np.mean(path_lengths-1)
 
 
+# Counts the features in the premises of used rules/ Count the features in the used path of a DT, idea was inspired by:
+# "Feature Importance Measurement based on Decision Tree Sampling" - https://arxiv.org/abs/2307.13333
+# The code skeleton for this method was created by an LLM, see thesis for details on the prompt and version.
 def count_features(model, explain_data, feature_names=None):
     feature_counts = Counter()
     if isinstance(model, str):
@@ -154,37 +162,35 @@ def count_features(model, explain_data, feature_names=None):
     return feature_counts
 
 
+# Plots the feature frequencies.
+# The code skeleton for this method was created by an LLM, see thesis for details on the prompt and version.
 def plot_feature_frequencies(counter, name):
     grouped = {}
     for feature, count in counter.items():
-        # Remove _number suffix if it exists
-        base_name = feature.split('_')[0] if '_' in feature else feature
+        base_name = feature.split("_")[0] if "_" in feature else feature
 
-        if base_name in ['male', 'female']:
-            base_name = 'sex'
-        elif base_name == 'Alter':
-            base_name = 'age'
+        if base_name in ["male", "female"]:
+            base_name = "sex"
+        elif base_name == "Alter":
+            base_name = "age"
 
         grouped[base_name] = grouped.get(base_name, 0) + count
 
-    # Sort by frequency (highest first)
     sorted_features = sorted(grouped.items(), key=lambda x: x[1], reverse=True)
     features, frequencies = zip(*sorted_features)
 
     plt.figure(figsize=(10, 6))
     plt.bar(features, frequencies)
-    plt.xlabel('Features')
-    plt.ylabel('Usage Frequency')
-    plt.xticks(rotation=45, ha='right')
-
-    plt.gca().yaxis.set_ticks([])
+    plt.xlabel("Features")
+    plt.ylabel("Usage Frequency")
+    plt.xticks(rotation=45, ha="right")
 
     plt.tight_layout()
     plt.savefig(f"{name}.png")
     plt.close()
     return
 
-# calcs baseline for faithfulness correlation by taking modes for categorical features and mean for age feature
+# Calculates baseline for faithfulness correlation by taking modes for categorical features and mean for age feature.
 def get_baseline(df):
     # get first row in case some modes are tied for some features
     feature_vector = df.mode().iloc[0]
@@ -194,7 +200,7 @@ def get_baseline(df):
     return feature_vector.to_numpy()
 
 
-# Calculate metrics
+# Calculates FI metrics.
 def score_fi_exp(model, explain_data, all_attributions, feature_names,
                  baseline, pred_inds, seed, kb, name, discretized_data_path, formatted_samples_path, pred_out):
     cmplx_scores, cmplx_avg = avg_complexities(all_attributions)
@@ -213,6 +219,7 @@ def score_fi_exp(model, explain_data, all_attributions, feature_names,
     return metric_results
 
 
+# Calculates Model Explanation metrics.
 def score_model_exp(model, explain_data, feature_names=None):
     exp_length_avg = avg_explanation_length(model, explain_data)
     feature_counts = count_features(model, explain_data, feature_names)

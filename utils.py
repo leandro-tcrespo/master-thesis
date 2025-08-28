@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
-from imblearn.under_sampling import RandomUnderSampler, ClusterCentroids
 from sklearn import clone
-from sklearn.model_selection import train_test_split
 
 import hkb
 
 
+# Resamples given data for given over-/undersampler, enc is needed to onehotencode/scale categorical/numerical features.
+# It"s used for logging and for preparing the background/explain data for Model-/FI-Explanations.
 def resample_data(enc, train_d, train_l, os=None, us=None):
     train_d_res = train_d.copy()
     train_l_res = train_l.copy()
@@ -17,14 +17,14 @@ def resample_data(enc, train_d, train_l, os=None, us=None):
     if us is not None:
         enc = clone(enc)
         us = clone(us)
-        if 'age' in columns:
-            cat_names = [name for name in train_d if name != 'age']
+        if "age" in columns:
+            cat_names = [name for name in train_d if name != "age"]
             age_index = train_d_res.columns.get_loc("age")
             train_d_ohe = enc.fit_transform(train_d_res, train_l_res)
             train_d_res, train_l_res = us.fit_resample(train_d_ohe, train_l_res)
             cat_part = train_d_res[:, :-1]
             cont_part = train_d_res[:, -1:]
-            train_d_cont = pd.DataFrame((enc.named_transformers_["AgeScaler"].inverse_transform(cont_part)), columns=['age'])
+            train_d_cont = pd.DataFrame((enc.named_transformers_["AgeScaler"].inverse_transform(cont_part)), columns=["age"])
             train_d_cont = train_d_cont.astype(int)
             train_d_res = pd.DataFrame((enc.named_transformers_["OneHot"].inverse_transform(cat_part)), columns=cat_names)
             train_d_res.insert(age_index, "age", train_d_cont)
@@ -35,6 +35,7 @@ def resample_data(enc, train_d, train_l, os=None, us=None):
     return train_d_res, train_l_res
 
 
+# Counts labels, for logging.
 def count_labels(labels):
     labels_copy = labels.copy()
     labels_df = pd.DataFrame(labels_copy, columns=["diag_multi"])
@@ -44,6 +45,7 @@ def count_labels(labels):
     return resampled_counts
 
 
+# Gets predicted label indices, used to select FI-Explanations only for the predicted labels.
 def get_predicted_labels(model, data, name=None, kb=None, formatted_samples_path=None, pred_out=None):
     if model == "hkb":
         class_names = hkb.CLASS_ORDER

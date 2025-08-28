@@ -12,6 +12,9 @@ import metrics
 import utils
 
 
+# Main method for FI explanations.
+# Sets up the LIME and SHAP explainers, gets the explanations for a given background and explain data set and then
+# evaluates the explanations via complexity and faithfulness. Explanations may also be plotted if needed.
 def fi_explain(
     model,
     explain_data,
@@ -50,7 +53,6 @@ def fi_explain(
                                                        random_state=seed
                                                        )
 
-    # Get predictions and explanations, predictions are logged
     pred_inds, pred_strings = utils.get_predicted_labels(model, explain_data, name, kb,
                                                          f"./explain_data_formatted_samples.txt",
                                                          f"./output/{name}/explain_data_predictions.txt")
@@ -58,8 +60,8 @@ def fi_explain(
     shap_explanations = get_shap_explanations(shap_explainer, explain_data, pred_inds)
     lime_explanations = get_lime_explanations(lime_explainer, explain_data, predict_proba, pred_inds)
 
-    # attribution arrays have the shape (samples, features), one attribution array per sample with an attribution for
-    # each feature
+    # Attribution arrays have the shape (samples, features), one attribution array per sample with an attribution for
+    # each feature.
     shap_attribution_arrays = get_shap_attributions(shap_explanations)
     lime_attribution_arrays = get_lime_attributions(lime_explanations, pred_inds)
 
@@ -84,6 +86,9 @@ def fi_explain(
     return metric_results_shap, metric_results_lime, shap_attribution_arrays, lime_attribution_arrays
 
 
+# Main method for model explanations.
+# Gets the feature counts of the model explanations and then evaluates the explanations via the feature_frequencies plot
+# and the explanation length.
 def model_explain(model, explain_data, name):
     if isinstance(model, str):
         metric_results, feature_counts = metrics.score_model_exp(model, explain_data)
@@ -97,26 +102,27 @@ def model_explain(model, explain_data, name):
         explain_data_transformed = transformer.transform(explain_data)
         metric_results, feature_counts = metrics.score_model_exp(dtclassifier, explain_data_transformed, feature_names)
         metrics.plot_feature_frequencies(feature_counts, f"./output/{name}/model_exp/plots/dt_feature_freq_plot.png")
-        dt.plot_tree_path(model, explain_data_transformed, feature_names, f"./output/{name}/model_exp/plots/exp_dt_")
     return metric_results
 
 
+# Plots LIME explanations.
+# The code skeleton for this method was created by an LLM, see thesis for details on the prompt and version.
 def plot_lime_explanations(explanations, pred_inds, name):
     for i, explanation in enumerate(explanations):
         explanation.as_pyplot_figure(label=pred_inds[i])
-        green_patch = mpatches.Patch(color='green', label='Supports Prediction')
-        red_patch = mpatches.Patch(color='red', label='Contradicts Prediction')
-        plt.legend(handles=[green_patch, red_patch], loc='lower left', bbox_to_anchor=(1.02, 0))
+        green_patch = mpatches.Patch(color="green", label="Supports Prediction")
+        red_patch = mpatches.Patch(color="red", label="Contradicts Prediction")
+        plt.legend(handles=[green_patch, red_patch], loc="lower left", bbox_to_anchor=(1.02, 0))
 
         predicted_class_prob = explanation.predict_proba[pred_inds[i]]
         lime_prediction = explanation.local_pred[0]
         intercept = explanation.intercept[pred_inds[i]]
 
-        proba_text = f'Model Prediction: {predicted_class_prob:.3f}\nLIME Prediction: {lime_prediction:.3f}\nIntercept: {intercept:.3f}'
+        proba_text = f"Model Prediction: {predicted_class_prob:.3f}\nLIME Prediction: {lime_prediction:.3f}\nIntercept: {intercept:.3f}"
         prob_box = AnchoredText(proba_text,
-                                loc='lower left',
+                                loc="lower left",
                                 bbox_to_anchor=(1.04, 0.15),
-                                prop=dict(size=8, ha='left'),
+                                prop=dict(size=8, ha="left"),
                                 frameon=True,
                                 bbox_transform=plt.gca().transAxes)
         prob_box.patch.set_boxstyle("round,pad=0.4")
@@ -127,6 +133,7 @@ def plot_lime_explanations(explanations, pred_inds, name):
         plt.close()
 
 
+# Plots SHAP explanations.
 def plot_shap_explanations(explanations, pred_strings, name):
     for i, explanation in enumerate(explanations):
         shap.plots.waterfall(explanation, show=False, max_display=19)
@@ -135,7 +142,7 @@ def plot_shap_explanations(explanations, pred_strings, name):
         plt.close()
 
 
-# explain_instance calcs the feature attributions for each sample and its predicted class
+# The call explain_instance calculates the feature attributions for each sample and its predicted class.
 def get_lime_explanations(explainer, explain_data, predict_proba, pred_inds):
     explain_data_arr = explain_data.to_numpy()
     explanations = []
@@ -148,14 +155,14 @@ def get_lime_explanations(explainer, explain_data, predict_proba, pred_inds):
     return explanations
 
 
-# explainer(data) calcs the feature attributions for all samples and returns an explanation object,
-# .values contains the attributions for all samples and classes, shape is (num_samples, num_features, num_classes)
-# individual explanations for each sample and their predicted class are stored in selected_shap_explanations,
-# they are accessed by essentially slicing the explanation object with all samples,
-# thus by slicing the shape (num_samples, num_features, num_classes) with the corresponding sample and class we are
-# interested in we get an explanation object that contains its attributions in .values with shape (num_features,),
-# every individual explanation also contains its corresponding data row, so it must not be saved (data privacy),
-# .values can be saved though
+# The call explainer(data) calculates the feature attributions for all samples and returns an explanation object,
+# .values contains the attributions for all samples and classes, shape is (num_samples, num_features, num_classes).
+# Individual explanations for each sample and their predicted class are stored in selected_shap_explanations,
+# they are accessed by essentially slicing the explanation object with all samples.
+# Thus by slicing the shape (num_samples, num_features, num_classes) with the corresponding sample and class we are
+# interested in, we get an explanation object that contains its attributions in .values with shape (num_features,).
+# Every individual explanation also contains its corresponding data row, so it must not be saved (data privacy),
+# .values can be saved though.
 def get_shap_explanations(explainer, explain_data, pred_inds):
     all_shap_explanations = explainer(explain_data)
     selected_shap_explanations = []
@@ -164,13 +171,14 @@ def get_shap_explanations(explainer, explain_data, pred_inds):
     return selected_shap_explanations
 
 
+# Gets the .values arrays for some given explanations.
 def get_shap_attributions(explanations):
     return [explanation.values for explanation in explanations]
 
 
-# get attributions from lime in order of features in the data
-# local_exp is a list of tuples that contains (index of feature in data, attribution of feature), the attributions array
-# for each sample is constructed by assigning the attribution of each feature to its corresponding feature index
+# Get attributions from LIME in order of features in the data,
+# local_exp is a list of tuples that contains (index of feature in data, attribution of feature). The attributions array
+# for each sample is constructed by assigning the attribution of each feature to its corresponding feature index.
 def get_lime_attributions(explanations, pred_inds):
     attribution_arrays = []
     for sample, explanation in enumerate(explanations):
@@ -183,7 +191,7 @@ def get_lime_attributions(explanations, pred_inds):
     return attribution_arrays
 
 
-# wraps predict_proba methods for use with shap and lime, model can be either a dt/mlp pipeline or string "hkb"
+# Wraps predict_proba methods for use with SHAP and LIME, model can be either a dt/mlp pipeline or string "hkb".
 class PredictProbaWrapper:
     def __init__(self, model, feature_names, name=None, kb=None, discretized_data_path=None,
                  formatted_samples_path=None, pred_out=None):
@@ -198,9 +206,7 @@ class PredictProbaWrapper:
     def __call__(self, data):
         df = pd.DataFrame(data, columns=self.feature_names)
         if self.model == "hkb":
-            # print("Input samples:", len(df))
             preds = hkb.predict_proba(df, self.name, self.kb, self.discretized_data_path, self.formatted_samples_path,
                                       self.pred_out)
             return preds
-        # print("Input samples:", len(df))
         return self.model.predict_proba(df)

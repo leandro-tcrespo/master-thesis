@@ -9,7 +9,8 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 import utils
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+# Suppresses warnings about onednn custom operations being on and available CPU instructions for potential better perf.
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
 from imblearn.pipeline import make_pipeline
 from keras.src.optimizers.schedules import ExponentialDecay
@@ -24,22 +25,22 @@ import preprocessing
 
 from feature_loader import feature_groups
 
-def make_folders (path):
+
+def make_folders(path):
     os.makedirs(f"./output/{path}/mlps", exist_ok=True)
     os.makedirs(f"./output/{path}/dts", exist_ok=True)
     os.makedirs(f"./output/{path}/hkbs", exist_ok=True)
     
 
-# logging stuff
+# Logging methods.
 def save_confusion_matrix(y_true, y_pred, model_name, output_path):
-    print('save confusion matrix path',output_path )
     plt.figure(figsize=(10, 8))
-    cm = confusion_matrix(y_true, y_pred, labels=['Kein','PsA','RA','SpA'])
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Kein','PsA','RA','SpA'])
+    cm = confusion_matrix(y_true, y_pred, labels=["Kein","PsA","RA","SpA"])
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Kein","PsA","RA","SpA"])
     disp.plot()
-    plt.title(f'{model_name} Confusion Matrix')
-    plt.savefig(f'{output_path}/{model_name}_confusion_matrix.png')
-    plt.close('all')
+    plt.title(f"{model_name} Confusion Matrix")
+    plt.savefig(f"{output_path}/{model_name}_confusion_matrix.png")
+    plt.close("all")
 
 
 def log_results(train_data, test_data, seed, id, enc, ros, tomek,name):
@@ -48,24 +49,22 @@ def log_results(train_data, test_data, seed, id, enc, ros, tomek,name):
     resampled_class_counts = utils.count_labels(train_labels_resampled).to_json()
 
     experiment_info = {
-        'random_state': seed,
-        'train_shape': train_data.shape,
-        'test_shape': test_data.shape,
-        'original_class_counts': original_class_counts,
-        'resampled_class_counts': resampled_class_counts
+        "random_state": seed,
+        "train_shape": train_data.shape,
+        "test_shape": test_data.shape,
+        "original_class_counts": original_class_counts,
+        "resampled_class_counts": resampled_class_counts
     }
 
     with open(f"./output/{name}/experiment_info_{id}.json", "w") as f:
         json.dump(experiment_info, f, indent=4)
 
 
-
-
-
+# Creates a Keras MLP with fixed hyperparameters from the Hyperparameter-Tuning, trains and then evaluates it.
 def fit_and_test_mlp(train_data, test_data, train_labels, test_labels, enc, ros, tomek, seed, id, name, mlp_f):
     base_mlp = kerasmlp.get_keras_model()
     base_mlp.set_params(
-        activation='relu',
+        activation="relu",
         batch_size=64,
         epochs=150,
         l2=0.0001,
@@ -86,9 +85,10 @@ def fit_and_test_mlp(train_data, test_data, train_labels, test_labels, enc, ros,
     return test_preds_mlp
 
 
+# Creates a DT with fixed hyperparameters from the Hyperparameter-Tuning, trains and then evaluates it.
 def fit_and_test_dt(train_data, test_data, train_labels, test_labels, enc, ros, tomek, seed, id, name, dt_f):
     base_dt = DecisionTreeClassifier(
-        criterion='entropy',
+        criterion="entropy",
         max_depth=10,
         min_samples_leaf=2,
         min_samples_split=5,
@@ -107,16 +107,17 @@ def fit_and_test_dt(train_data, test_data, train_labels, test_labels, enc, ros, 
     return test_preds_dt
 
 
+# Creates an HKB with fixed cluster size to 3 (determined through tests for different cluster sizes), trains and then evaluates it.
 def fit_and_test_hkb(train_data, test_data, train_labels, test_labels, id, name, hkb_f):
     if "age" in train_data.columns:
-        age_index = train_data.columns.get_loc('age')
+        age_index = train_data.columns.get_loc("age")
         hkb.fit(train_data, train_labels, name, f"{age_index+1}}}Alter_jung,Alter_mittel,Alter_alt", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
     else:
         hkb.fit(train_data, train_labels, name, "", f"hkb_{id}.kb", f"hkb_train_data_{id}.txt", train_data.shape[1])
     train_preds_hkb = hkb.predict(train_data, name, f"hkb_{id}.kb", f"hkb_train_samples_{id}.txt",
                                   f"./output/{name}/hkbs/train_preds_hkb_{id}.txt")
     test_preds_hkb = hkb.predict(test_data, name, f"hkb_{id}.kb", f"hkb_test_samples_{id}.txt",
-                                 f'./output/{name}/hkbs/test_preds_hkb_{id}.txt')
+                                 f"./output/{name}/hkbs/test_preds_hkb_{id}.txt")
     metrics.score(train_labels, train_preds_hkb, f"HKB_{id} training results:", hkb_f)
     metrics.score(test_labels, test_preds_hkb, f"HKB_{id} results:", hkb_f)
     shutil.copy2(f"hkb_{id}.kb", f"./output/{name}/hkbs/hkb_{id}.kb")
@@ -125,9 +126,10 @@ def fit_and_test_hkb(train_data, test_data, train_labels, test_labels, id, name,
     return test_preds_hkb
 
 
-# for reproducibility of the train test split
+# For reproducibility of the train test split across the iterations for each of the 6 feature sets.
 seeds = np.random.randint(0, 2 ** 31 - 1, size=6)
 
+# Loop over all feature sets from feature_loader.py. For each feature set the models are trained and evaluated 6 times.
 for name, cols_to_load in feature_groups.items():
     make_folders (name)
     
@@ -142,7 +144,7 @@ for name, cols_to_load in feature_groups.items():
     for i in range(6):
         seed = int(seeds[i])
         (train_data, test_data, train_labels, test_labels, enc,
-         ros, tomek, smote, enn) = (preprocessing.preprocess_data("../data/data.csv", cols_to_load, seed))
+         ros, tomek, smote, enn) = (preprocessing.preprocess_data("./Synthetic_data.csv", cols_to_load, seed))
         print("Starting MLP Training...")
         test_preds_mlp = fit_and_test_mlp(train_data, test_data, train_labels, test_labels, enc, ros, tomek, seed, i, name, mlp_f)
         print("Starting DT Training...")
@@ -160,8 +162,6 @@ for name, cols_to_load in feature_groups.items():
         np.save(f"./output/{name}/hkbs/test_preds_hkb_{i}.npy", test_preds_hkb)
     
         log_results(train_data, test_data, seed, i, enc, ros, tomek, name)
-    
-   
 
     mlp_f.close()
     dt_f.close()

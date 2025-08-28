@@ -50,30 +50,38 @@ make_folders(results_path_hkb_data_res)
 make_folders(results_path_mlp_both_res)
 make_folders(results_path_dt_both_res)
 
-seed = 681534355
+seed = np.random.randint(0, 2 ** 31 - 1)
 
-with open('dt.pkl', 'rb') as file:
+with open("dt.pkl", "rb") as file:
     dt = pickle.load(file)
 
-with open('mlp.pkl', 'rb') as file:
+with open("mlp.pkl", "rb") as file:
     mlp = pickle.load(file)
 
-train_data, test_data, train_labels, test_labels, enc, _, _, _, _ = preprocessing.preprocess_data("../data/data.csv", feature_loader.no_lab_features, 598398916)
+train_data, test_data, train_labels, test_labels, enc, _, _, _, _ = preprocessing.preprocess_data("./Synthetic_data.csv", feature_loader.all_features, seed)
 
-# "Hardcode" resampling, so "Kein" samples are subsampled to same sample size as "RA"
-explain_resampler = ClusterCentroids(sampling_strategy={"Kein": 23, "SpA":8, "PsA":23, "RA":22}, random_state=seed, voting="hard")
-background_resampler = ClusterCentroids(sampling_strategy={"Kein": 74, "SpA":25, "PsA":54, "RA":74}, random_state=seed, voting="hard")
+# This undersampling was specific to the given explain and background datasets.
+# # "Hardcode" resampling, so "Kein" samples are subsampled to same sample size as "RA".
+# explain_resampler = ClusterCentroids(sampling_strategy={"Kein": 23, "SpA":8, "PsA":23, "RA":22}, random_state=seed, voting="hard")
+# background_resampler = ClusterCentroids(sampling_strategy={"Kein": 74, "SpA":25, "PsA":54, "RA":74}, random_state=seed, voting="hard")
 
+# Undersampling for demonstration purposes.
+explain_resampler = ClusterCentroids(random_state=seed, voting="hard")
+background_resampler = ClusterCentroids(random_state=seed, voting="hard")
+
+# Set up the baseline for faithfulness correlation and the explain data.
 baseline = metrics.get_baseline(pd.concat([train_data, test_data]))
 explain_data = test_data
-# note that this fits the encoder on the test data, this is necessary here since the main goal is to correctly represent
+
+# Note that this fits the encoder on the test data. This is necessary here since the main goal is to correctly represent
 # the feature diversity in the test data, this would not necessarily be the case if the encoder fit on train data would
-# be used since there may be features that appear in the test data but not in the train data, those features would be ignored
+# be used since there may be features that appear in the test data but not in the train data, those features would be ignored.
 explain_data_res, explain_labels_res = utils.resample_data(enc, test_data, test_labels, us=explain_resampler)
 background_data = train_data
 background_data_res, background_labels_res = utils.resample_data(enc, train_data, train_labels, us=background_resampler)
-feature_names = feature_loader.no_lab_features
+feature_names = feature_loader.all_features
 
+# Count labels for logging.
 background_label_count = utils.count_labels(train_labels).to_json()
 background_label_res_count = utils.count_labels(background_labels_res).to_json()
 explain_label_count = utils.count_labels(test_labels).to_json()
@@ -83,10 +91,6 @@ label_counts = {"Background data:": background_label_count,
                 "Background data resampled:": background_label_res_count,
                 "Explain data:": explain_label_count,
                 "Explain data resampled:": explain_label_res_count}
-
-# saving explain data for eventual further visualizations of the model explanations, not stored in ./output, so I don't see the data
-explain_data.to_pickle("./explain_data_backups/explain_data.pkl")
-explain_data_res.to_pickle("./explain_data_backups/explain_data_res.pkl")
 
 with open(f"./output/label_counts.json", "w") as f:
     json.dump(label_counts, f, indent=4)

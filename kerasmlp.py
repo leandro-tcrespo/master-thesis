@@ -29,12 +29,12 @@ schedules = [ExponentialDecay(initial_learning_rate=0.001, decay_steps=50, decay
 # Param grid for Hyperparameter-Tuning.
 param_grid = {
     "kerasclassifier__optimizer__learning_rate": schedules,
-    # "kerasclassifier__batch_size": [32, 64],
-    # "kerasclassifier__units": [32, 64],
-    # "kerasclassifier__activation": ["relu", "leaky_relu"],
-    # "kerasclassifier__num_layers": [2, 3],
-    # "kerasclassifier__epochs": [100, 150],
-    # "kerasclassifier__l2": [0.0, 1e-5, 1e-4]
+    "kerasclassifier__batch_size": [32, 64],
+    "kerasclassifier__units": [32, 64],
+    "kerasclassifier__activation": ["relu", "leaky_relu"],
+    "kerasclassifier__num_layers": [2, 3],
+    "kerasclassifier__epochs": [100, 150],
+    "kerasclassifier__l2": [0.0, 1e-5, 1e-4]
 }
 
 

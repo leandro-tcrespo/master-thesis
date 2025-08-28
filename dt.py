@@ -23,6 +23,7 @@ def fit(model, t_data, t_labels, grid):
 
 
 # Calculates ccp alpha candidates for a given dt and then runs a GridSearchCV through all those candidates.
+# This method was implemented by following this tutorial: https://scikit-learn.org/stable/auto_examples/tree/plot_cost_complexity_pruning.html
 def prune(pipeline, t_data, t_labels):
     dt = pipeline.named_steps["decisiontreeclassifier"]
     path = dt.cost_complexity_pruning_path(t_data, t_labels)
